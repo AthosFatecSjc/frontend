@@ -12,9 +12,10 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/indicadores': {
+      '/api/indicadores': {
         target: 'http://localhost:8181',
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
       },
       '/java': {
         target: 'http://localhost:8181',
