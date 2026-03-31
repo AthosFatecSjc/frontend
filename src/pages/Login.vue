@@ -63,7 +63,7 @@ function goToRegister() {
         <header class="login-head">
           <p class="login-kicker">AUTENTICACAO</p>
           <h1 class="login-title">Entrar na plataforma</h1>
-          <p class="login-subtitle">O acesso esta disponivel apenas para usuarios aprovados.</p>
+          <p class="login-subtitle">O acesso está disponível apenas para usuários aprovados.</p>
         </header>
 
         <form class="login-form" @submit.prevent="onSubmit">
