@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h1>Indicadores</h1>
+    <AppHeading title="Indicadores" size="md" />
     <div v-if="loading">Carregando...</div>
     <div v-else>
       <table v-if="indicadores.length">
@@ -34,6 +34,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import AppHeading from '../components/utils/AppHeading.vue';
 
 interface Concessionaria {
   id: number;

@@ -1,6 +1,10 @@
+<script setup lang="ts">
+import AppHeading from '../components/utils/AppHeading.vue'
+</script>
+
 <template>
   <section>
-    <h1>Dashboard</h1>
+    <AppHeading title="Dashboard" size="md" />
     <p>Area administrativa em construcao.</p>
   </section>
 </template>

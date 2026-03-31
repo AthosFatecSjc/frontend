@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { loginWithStorage } from '../services/authService'
 import type { LoginResultType } from '../types/auth'
 import logoImage from '../assets/logo.png'
+import AppHeading from '../components/utils/AppHeading.vue'
 
 type StatusState = {
   type: LoginResultType
@@ -61,9 +62,12 @@ function goToRegister() {
     <main class="login-main">
       <section class="login-card">
         <header class="login-head">
-          <p class="login-kicker">AUTENTICAÇÃO</p>
-          <h1 class="login-title">Entrar na plataforma</h1>
-          <p class="login-subtitle">O acesso está disponível apenas para usuários aprovados.</p>
+          <AppHeading
+            eyebrow="AUTENTICAÇÃO"
+            title="Entrar na plataforma"
+            subtitle="O acesso está disponível apenas para usuários aprovados."
+            size="lg"
+          />
         </header>
 
         <form class="login-form" @submit.prevent="onSubmit">
