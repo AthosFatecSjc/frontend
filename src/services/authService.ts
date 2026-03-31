@@ -40,25 +40,42 @@ function appendLog(entry: LogEntry) {
 
 export async function loginWithStorage(email: string, senha: string): Promise<LoginResult> {
   const users = readUsers()
-  const userByEmail = users.find(user => user.email === email)
 
-  if (userByEmail?.status === 'PENDENTE') {
+  // Primeiro, valide as credenciais (e-mail + senha) para evitar expor status
+  const user = users.find(currentUser => currentUser.email === email && currentUser.senhaHash === senha)
+
+  if (!user) {
+    appendLog({
+      id: Date.now().toString(),
+      userId: 'unknown',
+      userName: email,
+      action: 'Tentativa de login',
+      timestamp: new Date().toISOString(),
+      details: 'Login falhou',
+    })
+
+    return {
+      type: 'invalid',
+      message: 'Credenciais inválidas. Verifique seu e-mail e senha.',
+    }
+  }
+
+  // Após autenticar, trate o status do usuário autenticado
+  if (user.status === 'PENDENTE') {
     return {
       type: 'pending',
       message: 'Seu cadastro está pendente de aprovação. Aguarde a análise do administrador.',
     }
   }
 
-  if (userByEmail?.status === 'REJEITADO') {
+  if (user.status === 'REJEITADO') {
     return {
       type: 'rejected',
       message: 'Seu acesso foi rejeitado. Entre em contato com o administrador para mais informações.',
     }
   }
 
-  const user = users.find(currentUser => currentUser.email === email && currentUser.senhaHash === senha)
-
-  if (!user || user.status !== 'ATIVO') {
+  if (user.status !== 'ATIVO') {
     appendLog({
       id: Date.now().toString(),
       userId: 'unknown',
