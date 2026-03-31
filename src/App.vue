@@ -1,10 +1,14 @@
 <script setup lang="ts"></script>
 
-
-
 <template>
-  <nav style="margin-bottom: 1rem">
-    <router-link to="/indicadores">Indicadores</router-link>
-  </nav>
   <router-view />
 </template>
+
+<style>
+html,
+body,
+#app {
+  margin: 0;
+  min-height: 100%;
+}
+</style>
