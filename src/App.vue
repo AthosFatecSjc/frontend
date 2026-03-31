@@ -3,8 +3,10 @@
 
 
 <template>
-  <nav style="margin-bottom: 1rem">
-    <router-link to="/indicadores">Indicadores</router-link>
-  </nav>
-  <router-view />
+  <v-app>
+    <nav style="margin-bottom: 1rem">
+      <router-link to="/indicadores">Indicadores</router-link>
+    </nav>
+    <router-view />
+  </v-app>
 </template>
