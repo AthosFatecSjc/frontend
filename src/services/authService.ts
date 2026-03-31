@@ -45,14 +45,14 @@ export async function loginWithStorage(email: string, senha: string): Promise<Lo
   if (userByEmail?.status === 'PENDENTE') {
     return {
       type: 'pending',
-      message: 'Seu cadastro esta pendente de aprovacao. Aguarde a analise do administrador.',
+      message: 'Seu cadastro está pendente de aprovação. Aguarde a análise do administrador.',
     }
   }
 
   if (userByEmail?.status === 'REJEITADO') {
     return {
       type: 'rejected',
-      message: 'Seu acesso foi rejeitado. Entre em contato com o administrador para mais informacoes.',
+      message: 'Seu acesso foi rejeitado. Entre em contato com o administrador para mais informações.',
     }
   }
 
@@ -70,7 +70,7 @@ export async function loginWithStorage(email: string, senha: string): Promise<Lo
 
     return {
       type: 'invalid',
-      message: 'Credenciais invalidas. Verifique seu e-mail e senha.',
+      message: 'Credenciais inválidas. Verifique seu e-mail e senha.',
     }
   }
 
