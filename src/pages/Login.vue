@@ -61,7 +61,7 @@ function goToRegister() {
     <main class="login-main">
       <section class="login-card">
         <header class="login-head">
-          <p class="login-kicker">AUTENTICACAO</p>
+          <p class="login-kicker">AUTENTICAÇÃO</p>
           <h1 class="login-title">Entrar na plataforma</h1>
           <p class="login-subtitle">O acesso está disponível apenas para usuários aprovados.</p>
         </header>
