@@ -7,7 +7,7 @@ defineProps<{
 
 <template>
   <div class="page-header">
-    <p class="page-header__eyebrow">Area interna</p>
+    <p class="page-header__eyebrow">Área interna</p>
     <div class="page-header__stack">
       <div>
         <h1 class="page-header__title">{{ title }}</h1>

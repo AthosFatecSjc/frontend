@@ -23,7 +23,7 @@ const visibleItems = computed(() => items.map(item => ({
 <template>
   <nav class="modules-menu">
     <div class="modules-menu__header">
-      <p v-if="!props.collapsed" class="modules-menu__eyebrow">Modulos</p>
+      <p v-if="!props.collapsed" class="modules-menu__eyebrow">Módulos</p>
       <div v-else class="modules-menu__spacer"></div>
     </div>
 
