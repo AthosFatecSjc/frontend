@@ -32,6 +32,58 @@ const hasChanges = computed(() => (
   || form.value.telefone !== (account.value?.telefone ?? '')
 ))
 
+function isAllowedControlKey(event: KeyboardEvent) {
+  const allowedKeys = [
+    'Backspace',
+    'Delete',
+    'Tab',
+    'Enter',
+    'Escape',
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowUp',
+    'ArrowDown',
+    'Home',
+    'End',
+  ]
+
+  if (allowedKeys.includes(event.key)) return true
+
+  if ((event.ctrlKey || event.metaKey) && ['a', 'c', 'v', 'x', 'z', 'y'].includes(event.key.toLowerCase())) {
+    return true
+  }
+
+  return false
+}
+
+function handleNomeCompletoKeydown(event: KeyboardEvent) {
+  if (isAllowedControlKey(event)) return
+  if (/^\d$/.test(event.key)) event.preventDefault()
+}
+
+function handleNomeCompletoBeforeInput(event: InputEvent) {
+  if (event.data && /\d/.test(event.data)) event.preventDefault()
+}
+
+function handleNomeCompletoPaste(event: ClipboardEvent) {
+  const text = event.clipboardData?.getData('text') ?? ''
+  if (/\d/.test(text)) event.preventDefault()
+}
+
+function handleTelefoneKeydown(event: KeyboardEvent) {
+  if (isAllowedControlKey(event)) return
+  if (!/^\d$/.test(event.key)) event.preventDefault()
+}
+
+function handleTelefoneBeforeInput(event: InputEvent) {
+  if (event.data && /\D/.test(event.data)) event.preventDefault()
+}
+
+function handleTelefonePaste(event: ClipboardEvent) {
+  const text = event.clipboardData?.getData('text') ?? ''
+  if (/\D/.test(text)) event.preventDefault()
+}
+
 function formatPhone(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 11)
 
@@ -104,8 +156,8 @@ onMounted(loadMinhaConta)
 <template>
   <AuthenticatedLayout
     title="Minha Conta"
-    description="Atualize os dados permitidos do seu cadastro e acompanhe as informacoes protegidas vinculadas ao seu acesso."
-    user-name="Usuario interno"
+    description="Atualize os dados permitidos do seu cadastro e acompanhe as informações protegidas vinculadas ao seu acesso."
+    user-name="Usuário interno"
     role-label="Plataforma"
   >
     <UiCard>
@@ -113,7 +165,7 @@ onMounted(loadMinhaConta)
         <p class="section-eyebrow">Dados cadastrais</p>
         <h2 class="section-title">Minha Conta</h2>
         <p class="section-description">
-          Os campos editaveis podem ser alterados diretamente. E-mail, data de cadastro e status permanecem protegidos.
+          Os campos editáveis podem ser alterados diretamente. E-mail, data de cadastro e status permanecem protegidos.
         </p>
 
         <UiAlert v-if="errorMessage" tone="danger">{{ errorMessage }}</UiAlert>
@@ -124,8 +176,14 @@ onMounted(loadMinhaConta)
         <form v-else class="form-grid" @submit.prevent="handleSave">
           <div class="field field--full">
             <UiLabel for="nomeCompleto">Nome completo</UiLabel>
-            <UiInput id="nomeCompleto" v-model="form.nomeCompleto" />
-            <span class="field-hint field-hint--editable">Campo editavel</span>
+            <UiInput
+              id="nomeCompleto"
+              v-model="form.nomeCompleto"
+              @keydown="handleNomeCompletoKeydown"
+              @beforeinput="handleNomeCompletoBeforeInput"
+              @paste="handleNomeCompletoPaste"
+            />
+            <span class="field-hint field-hint--editable">Campo editável</span>
           </div>
 
           <div class="field field--full">
@@ -134,9 +192,12 @@ onMounted(loadMinhaConta)
               id="telefone"
               :model-value="form.telefone"
               placeholder="(11) 99999-9999"
+              @keydown="handleTelefoneKeydown"
+              @beforeinput="handleTelefoneBeforeInput"
+              @paste="handleTelefonePaste"
               @update:model-value="form.telefone = formatPhone($event)"
             />
-            <span class="field-hint field-hint--editable">Campo editavel</span>
+            <span class="field-hint field-hint--editable">Campo editável</span>
           </div>
 
           <div class="field">
@@ -163,7 +224,7 @@ onMounted(loadMinhaConta)
           </div>
 
           <UiButton type="submit" :disabled="!hasChanges || saving">
-            {{ saving ? 'Salvando...' : 'Salvar alteracoes' }}
+            {{ saving ? 'Salvando...' : 'Salvar alterações' }}
           </UiButton>
         </form>
       </div>
