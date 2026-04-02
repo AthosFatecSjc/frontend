@@ -5,7 +5,27 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/minha-conta',
+      redirect: '/login',
+    },
+    {
+      path: '/login',
+      name: 'Login',
+      component: () => import('../pages/Login.vue'),
+    },
+    {
+      path: '/cadastro',
+      name: 'Cadastro',
+      component: () => import('../pages/Cadastro.vue'),
+    },
+    {
+      path: '/dashboard',
+      name: 'Dashboard',
+      component: () => import('../pages/Dashboard.vue'),
+    },
+    {
+      path: '/indicadores',
+      name: 'Indicadores',
+      component: () => import('../pages/Indicadores.vue'),
     },
     {
       path: '/minha-conta',
