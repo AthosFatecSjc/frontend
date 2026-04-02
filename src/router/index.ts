@@ -8,6 +8,21 @@ const router = createRouter({
       redirect: '/minha-conta',
     },
     {
+      path: '/login',
+      name: 'Login',
+      component: () => import('../pages/Login.vue'),
+    },
+    {
+      path: '/cadastro',
+      name: 'Cadastro',
+      component: () => import('../pages/Cadastro.vue'),
+    },
+    {
+      path: '/dashboard',
+      name: 'Dashboard',
+      component: () => import('../pages/Dashboard.vue'),
+    },
+    {
       path: '/minha-conta',
       name: 'MinhaConta',
       component: () => import('../pages/MinhaConta.vue'),
