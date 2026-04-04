@@ -12,6 +12,7 @@ const route = useRoute()
 
 const items = [
   { label: 'Minha Conta', to: '/minha-conta', icon: 'user', match: ['/minha-conta'] },
+  { label: 'Logs e Auditoria', to: '/admin/logs', icon: 'logs', match: ['/admin/logs'] },
 ]
 
 const visibleItems = computed(() => items.map(item => ({
@@ -38,22 +39,42 @@ const visibleItems = computed(() => items.map(item => ({
       >
         <span class="modules-menu__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" class="modules-menu__svg">
-            <path
-              d="M7.75 18.25a4.25 4.25 0 0 1 8.5 0M15.75 8.75A3.75 3.75 0 1 1 12 5a3.75 3.75 0 0 1 3.75 3.75Z"
-              fill="none"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="1.7"
-            />
-            <circle
-              cx="12"
-              cy="12"
-              r="9"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.7"
-            />
+            <template v-if="item.icon === 'logs'">
+              <path
+                d="M14 3h-4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+              <path
+                d="M14 3v6h6M11 13h6M11 17h6"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+            </template>
+            <template v-else>
+              <path
+                d="M7.75 18.25a4.25 4.25 0 0 1 8.5 0M15.75 8.75A3.75 3.75 0 1 1 12 5a3.75 3.75 0 0 1 3.75 3.75Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+              <circle
+                cx="12"
+                cy="12"
+                r="9"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+              />
+            </template>
           </svg>
         </span>
         <span v-if="!props.collapsed">{{ item.label }}</span>
