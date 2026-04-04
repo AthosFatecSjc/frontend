@@ -23,9 +23,9 @@ const router = createRouter({
       component: () => import('../pages/Dashboard.vue'),
     },
     {
-      path: '/indicadores',
-      name: 'Indicadores',
-      component: () => import('../pages/Indicadores.vue'),
+      path: '/minha-conta',
+      name: 'MinhaConta',
+      component: () => import('../pages/MinhaConta.vue'),
     },
     {
       path: '/admin/logs',
