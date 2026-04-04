@@ -1,33 +1,130 @@
-<template>
-  <section class="audit-page">
+<script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
+import AuthenticatedLayout from '../components/layout/AuthenticatedLayout.vue'
+import type { LogEntry, StoredUser } from '../types/auth'
 
-    <!-- Header -->
-    <div class="page-header">
-      <div class="header-left">
-        <div class="header-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-        </div>
-        <div>
-          <h1 class="page-title">Logs &amp; Auditoria</h1>
-          <p class="page-subtitle">Eventos criticos da plataforma · Monitoramento e rastreabilidade</p>
-        </div>
+const API_URL = '/api/energia/system-logs'
+const PAGE_SIZE = 50
+
+const logs = ref<LogEntry[]>([])
+const total = ref(0)
+const isLoading = ref(false)
+const error = ref('')
+const isAdmin = ref(false)
+const currentPage = ref(1)
+
+const filters = ref({
+  startDate: '',
+  endDate: '',
+  evento: '',
+  resultado: '',
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
+
+const visiblePages = computed(() => {
+  const t = totalPages.value
+  const c = currentPage.value
+  if (t <= 7) return Array.from({ length: t }, (_, i) => i + 1)
+  const pages: (number | string)[] = [1]
+  if (c > 3) pages.push('...')
+  for (let i = Math.max(2, c - 1); i <= Math.min(t - 1, c + 1); i++) pages.push(i)
+  if (c < t - 2) pages.push('...')
+  pages.push(t)
+  return pages
+})
+
+async function fetchLogs() {
+  isLoading.value = true
+  error.value = ''
+
+  const params = new URLSearchParams({
+    page:     String(currentPage.value),
+    pageSize: String(PAGE_SIZE),
+  })
+  if (filters.value.startDate) params.set('startDate', filters.value.startDate)
+  if (filters.value.endDate)   params.set('endDate',   filters.value.endDate)
+  if (filters.value.evento)    params.set('evento',    filters.value.evento)
+  if (filters.value.resultado) params.set('resultado', filters.value.resultado)
+
+  try {
+    const res = await fetch(`${API_URL}?${params.toString()}`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+
+    const json: { data: LogEntry[]; total: number } = await res.json()
+    logs.value  = json.data
+    total.value = json.total
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Erro inesperado ao carregar logs.'
+    logs.value  = []
+    total.value = 0
+  } finally {
+    isLoading.value = false
+  }
+}
+
+function applyFilters() {
+  currentPage.value = 1
+  fetchLogs()
+}
+
+function clearFilters() {
+  filters.value = { startDate: '', endDate: '', evento: '', resultado: '' }
+  currentPage.value = 1
+  fetchLogs()
+}
+
+function prevPage() {
+  if (currentPage.value > 1) { currentPage.value--; fetchLogs() }
+}
+
+function nextPage() {
+  if (currentPage.value < totalPages.value) { currentPage.value++; fetchLogs() }
+}
+
+function goToPage(p: number) {
+  currentPage.value = p
+  fetchLogs()
+}
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  })
+}
+
+function checkAdmin() {
+  const userStr = localStorage.getItem('currentUser')
+  if (userStr) {
+    const user: StoredUser = JSON.parse(userStr)
+    isAdmin.value = user.role === 'ADMIN'
+  }
+}
+
+onMounted(() => {
+  checkAdmin()
+  if (isAdmin.value) fetchLogs()
+})
+</script>
+
+<template>
+  <AuthenticatedLayout
+    title="Logs e Auditoria"
+    description="Consulta de eventos críticos da plataforma para monitoramento técnico e rastreabilidade administrativa"
+  >
+    <!-- Acesso restrito -->
+    <div v-if="!isAdmin" class="state-container state-restricted">
+      <div class="state-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
       </div>
-      <div class="header-badges">
-        <span class="badge badge-secure">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Dados minimizados
-        </span>
-        <span class="badge badge-anon">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
-          IDs pseudonimizados
-        </span>
-      </div>
+      <p class="state-title">Acesso restrito</p>
+      <p class="state-text">Área acessível apenas por administradores autorizados.</p>
     </div>
 
-    <!-- Filters -->
-    <div class="filters-panel">
+    <template v-else>
+      <!-- Filters -->
+      <div class="filters-panel">
       <div class="filters-grid">
         <div class="field-group">
           <label class="field-label">Data inicial</label>
@@ -69,26 +166,15 @@
       <p class="state-text">Carregando registros...</p>
     </div>
 
-    <!-- Error -->
-    <div v-else-if="error" class="state-container state-error">
-      <div class="state-icon">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+      <!-- Error -->
+      <div v-if="error" class="state-container state-error">
+        <div class="state-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+        </div>
+        <p class="state-title">Erro ao carregar</p>
+        <p class="state-text">{{ error }}</p>
+        <button class="btn-clear-inline" @click="fetchLogs">Tentar novamente</button>
       </div>
-      <p class="state-title">Erro ao carregar</p>
-      <p class="state-text">{{ error }}</p>
-      <button class="btn-clear-inline" @click="fetchLogs">Tentar novamente</button>
-    </div>
-
-    <!-- Sem permissao -->
-    <div v-else-if="!isAdmin" class="state-container state-restricted">
-      <div class="state-icon">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-      </div>
-      <p class="state-title">Acesso restrito</p>
-      <p class="state-text">Esta area e acessivel apenas por administradores autorizados.</p>
-    </div>
-
-    <template v-else>
       <!-- Results bar -->
       <div class="results-bar">
         <span class="results-count">
@@ -163,305 +249,381 @@
         </button>
       </div>
     </template>
-
-  </section>
+  </AuthenticatedLayout>
 </template>
 
-<script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import type { LogEntry, StoredUser } from '../types/auth'
-
-// ── Constantes ───────────────────────────────────────────────
-const API_URL = '/api/energia/system-logs' // ajuste para sua baseURL/instancia axios
-const PAGE_SIZE = 50
-
-// ── Estado ───────────────────────────────────────────────────
-const logs = ref<LogEntry[]>([])
-const total = ref(0)          // total geral retornado pelo backend
-const isLoading = ref(false)
-const error = ref('')
-const isAdmin = ref(false)
-const currentPage = ref(1)
-
-const filters = ref({
-  startDate: '',
-  endDate: '',
-  evento: '',
-  resultado: '',
-})
-
-// ── Derivados ─────────────────────────────────────────────────
-// totalPages calculado a partir do total do backend — sem dados locais
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
-
-// Paginacao estilo "1 ... 4 5 6 ... 20"
-const visiblePages = computed(() => {
-  const t = totalPages.value
-  const c = currentPage.value
-  if (t <= 7) return Array.from({ length: t }, (_, i) => i + 1)
-  const pages: (number | string)[] = [1]
-  if (c > 3) pages.push('...')
-  for (let i = Math.max(2, c - 1); i <= Math.min(t - 1, c + 1); i++) pages.push(i)
-  if (c < t - 2) pages.push('...')
-  pages.push(t)
-  return pages
-})
-
-// ── API ──────────────────────────────────────────────────────
-async function fetchLogs() {
-  isLoading.value = true
-  error.value = ''
-
-  // Monta query params — filtros vazios sao omitidos
-  const params = new URLSearchParams({
-    page:     String(currentPage.value),
-    pageSize: String(PAGE_SIZE),
-  })
-  if (filters.value.startDate) params.set('startDate', filters.value.startDate)
-  if (filters.value.endDate)   params.set('endDate',   filters.value.endDate)
-  if (filters.value.evento)    params.set('evento',    filters.value.evento)
-  if (filters.value.resultado) params.set('resultado', filters.value.resultado)
-
-  try {
-    const res = await fetch(`${API_URL}?${params.toString()}`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-
-    // Contrato esperado: { data: LogEntry[], total: number }
-    const json: { data: LogEntry[]; total: number } = await res.json()
-    logs.value  = json.data
-    total.value = json.total
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Erro inesperado ao carregar logs.'
-    logs.value  = []
-    total.value = 0
-  } finally {
-    isLoading.value = false
-  }
-}
-
-// ── Acoes ────────────────────────────────────────────────────
-function applyFilters() {
-  currentPage.value = 1  // sempre reinicia na pagina 1 ao filtrar
-  fetchLogs()
-}
-
-function clearFilters() {
-  filters.value = { startDate: '', endDate: '', evento: '', resultado: '' }
-  currentPage.value = 1
-  fetchLogs()
-}
-
-function prevPage() {
-  if (currentPage.value > 1) { currentPage.value--; fetchLogs() }
-}
-
-function nextPage() {
-  if (currentPage.value < totalPages.value) { currentPage.value++; fetchLogs() }
-}
-
-function goToPage(p: number) {
-  currentPage.value = p
-  fetchLogs()
-}
-
-// ── Utilitarios ──────────────────────────────────────────────
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-  })
-}
-
-function checkAdmin() {
-  const userStr = localStorage.getItem('currentUser')
-  if (userStr) {
-    const user: StoredUser = JSON.parse(userStr)
-    isAdmin.value = user.role === 'ADMIN'
-  }
-}
-
-// ── Init ─────────────────────────────────────────────────────
-onMounted(() => {
-  checkAdmin()
-  if (isAdmin.value) fetchLogs()
-})
-</script>
-
 <style scoped>
-.audit-page {
-  --bg: #f5f7fa;
-  --surface: #ffffff;
-  --surface-2: #f0f3f7;
-  --border: #dde2ea;
-  --border-light: #eef1f5;
-  --text: #111827;
-  --text-muted: #6b7280;
-  --text-dim: #9ca3af;
-  --accent: #2563eb;
-  --accent-dim: rgba(37,99,235,0.08);
-  --success: #16a34a;
-  --success-dim: rgba(22,163,74,0.08);
-  --danger: #dc2626;
-  --danger-dim: rgba(220,38,38,0.08);
-  --warning: #b45309;
-  --radius: 8px;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
-  --font-sans: 'IBM Plex Sans', 'DM Sans', system-ui, sans-serif;
-
-  font-family: var(--font-sans);
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  padding: 32px 28px 64px;
-  max-width: 1320px;
-  margin: 0 auto;
-  box-sizing: border-box;
-}
-
-/* Header */
-.page-header {
-  display: flex; align-items: flex-start;
-  justify-content: space-between; flex-wrap: wrap;
-  gap: 16px; margin-bottom: 28px;
-}
-.header-left { display: flex; align-items: center; gap: 14px; }
-.header-icon {
-  width: 46px; height: 46px; border-radius: var(--radius);
-  background: var(--accent-dim); border: 1px solid rgba(37,99,235,0.2);
-  display: flex; align-items: center; justify-content: center;
-  color: var(--accent); flex-shrink: 0;
-}
-.page-title { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); margin: 0 0 3px; }
-.page-subtitle { font-size: 0.8rem; color: var(--text-muted); margin: 0; }
-.header-badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.badge {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 4px 10px; border-radius: 20px;
-  font-size: 0.72rem; font-weight: 500; letter-spacing: 0.01em;
-}
-.badge-secure { background: var(--success-dim); color: var(--success); border: 1px solid rgba(22,163,74,0.2); }
-.badge-anon   { background: var(--accent-dim);  color: var(--accent);  border: 1px solid rgba(37,99,235,0.2); }
-
 /* Filters */
 .filters-panel {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 18px 20px; margin-bottom: 20px;
+  background: #ffffff;
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
 }
+
 .filters-grid {
-  display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto;
-  gap: 12px; align-items: end;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
 }
+
 @media (max-width: 860px) {
-  .filters-grid { grid-template-columns: 1fr 1fr; }
-  .field-group--action { grid-column: 1 / -1; }
+  .filters-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .field-group--action {
+    grid-column: 1 / -1;
+  }
 }
-.field-group { display: flex; flex-direction: column; gap: 5px; }
-.field-group--action { display: flex; gap: 8px; align-items: flex-end; }
-.field-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field-group--action {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.field-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+
 .field-input {
-  background: var(--bg); border: 1px solid var(--border); color: var(--text);
-  border-radius: 6px; padding: 7px 10px; font-size: 0.85rem;
-  font-family: var(--font-sans); outline: none;
-  transition: border-color 0.15s; width: 100%; box-sizing: border-box; color-scheme: light;
+  background: #f5f7fa;
+  border: 1px solid #dde2ea;
+  color: #111827;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+  color-scheme: light;
 }
-.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+
+.field-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
 .btn-apply {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: var(--accent); color: #fff; border: none; border-radius: 6px;
-  padding: 8px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
-  white-space: nowrap; transition: background 0.15s, transform 0.1s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, transform 0.1s;
 }
-.btn-apply:hover  { background: #1d4ed8; }
-.btn-apply:active { transform: scale(0.97); }
+
+.btn-apply:hover {
+  background: #1d4ed8;
+}
+
+.btn-apply:active {
+  transform: scale(0.97);
+}
+
 .btn-clear {
-  background: transparent; color: var(--text-muted);
-  border: 1px solid var(--border); border-radius: 6px;
-  padding: 8px 14px; font-size: 0.85rem; cursor: pointer;
-  white-space: nowrap; transition: color 0.15s, border-color 0.15s;
+  background: transparent;
+  color: #6b7280;
+  border: 1px solid #dde2ea;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
 }
-.btn-clear:hover { color: var(--text); border-color: var(--text-muted); }
+
+.btn-clear:hover {
+  color: #111827;
+  border-color: #6b7280;
+}
 
 /* Results bar */
 .results-bar {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 10px; font-size: 0.8rem; color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 0.8rem;
+  color: #6b7280;
 }
-.results-count strong { color: var(--text); font-weight: 600; }
+
+.results-count strong {
+  color: #111827;
+  font-weight: 600;
+}
 
 /* States */
 .state-container {
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 10px; padding: 72px 24px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 72px 24px;
+  background: #ffffff;
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  text-align: center;
 }
+
 .state-icon {
-  width: 60px; height: 60px; border-radius: 50%;
-  background: var(--surface-2); border: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: center;
-  color: var(--text-dim); margin-bottom: 4px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #f0f3f7;
+  border: 1px solid #dde2ea;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  margin-bottom: 4px;
 }
-.state-error      .state-icon { color: var(--danger);  background: var(--danger-dim);   border-color: rgba(220,38,38,0.2); }
-.state-restricted .state-icon { color: var(--warning); background: rgba(180,83,9,0.08); border-color: rgba(180,83,9,0.2); }
-.state-empty      .state-icon { color: var(--text-dim); }
-.state-title { font-weight: 600; font-size: 1rem; color: var(--text); margin: 0; }
-.state-text  { font-size: 0.85rem; color: var(--text-muted); margin: 0; max-width: 320px; }
+
+.state-error .state-icon {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.state-restricted .state-icon {
+  color: #b45309;
+  background: rgba(180, 83, 9, 0.08);
+  border-color: rgba(180, 83, 9, 0.2);
+}
+
+.state-empty .state-icon {
+  color: #9ca3af;
+}
+
+.state-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #111827;
+  margin: 0;
+}
+
+.state-text {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0;
+  max-width: 320px;
+}
 
 .spinner {
-  width: 32px; height: 32px;
-  border: 2px solid var(--border); border-top-color: var(--accent);
-  border-radius: 50%; animation: spin 0.7s linear infinite; margin-bottom: 4px;
+  width: 32px;
+  height: 32px;
+  border: 2px solid #dde2ea;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-bottom: 4px;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 .btn-clear-inline {
-  margin-top: 6px; background: transparent;
-  border: 1px solid var(--border); color: var(--text-muted);
-  border-radius: 6px; padding: 6px 14px; font-size: 0.82rem;
-  cursor: pointer; transition: color 0.15s, border-color 0.15s;
+  margin-top: 6px;
+  background: transparent;
+  border: 1px solid #dde2ea;
+  color: #6b7280;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
 }
-.btn-clear-inline:hover { color: var(--text); border-color: var(--text-muted); }
+
+.btn-clear-inline:hover {
+  color: #111827;
+  border-color: #6b7280;
+}
 
 /* Table */
-.table-wrapper { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; overflow-x: auto; }
-.logs-table { width: 100%; border-collapse: collapse; min-width: 860px; font-size: 0.84rem; }
-.logs-table thead { background: var(--surface-2); border-bottom: 1px solid var(--border); }
-.logs-table th {
-  padding: 11px 14px; text-align: left; font-size: 0.7rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted);
-  white-space: nowrap; position: sticky; top: 0;
-  background: var(--surface-2); z-index: 1; border-bottom: 1px solid var(--border);
+.table-wrapper {
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  overflow: hidden;
+  overflow-x: auto;
 }
-.logs-table tbody tr { border-bottom: 1px solid var(--border-light); background: var(--surface); transition: background 0.1s; }
-.logs-table tbody tr:last-child { border-bottom: none; }
-.logs-table tbody tr:hover { background: var(--surface-2); }
-.logs-table td { padding: 10px 14px; vertical-align: middle; color: var(--text); }
-.td-mono  { font-family: var(--font-mono); font-size: 0.78rem; }
-.td-muted { color: var(--text-muted); }
+
+.logs-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+  font-size: 0.84rem;
+}
+
+.logs-table thead {
+  background: #f0f3f7;
+  border-bottom: 1px solid #dde2ea;
+}
+
+.logs-table th {
+  padding: 11px 14px;
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #6b7280;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: #f0f3f7;
+  z-index: 1;
+  border-bottom: 1px solid #dde2ea;
+}
+
+.logs-table tbody tr {
+  border-bottom: 1px solid #eef1f5;
+  background: #ffffff;
+  transition: background 0.1s;
+}
+
+.logs-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.logs-table tbody tr:hover {
+  background: #f0f3f7;
+}
+
+.logs-table td {
+  padding: 10px 14px;
+  vertical-align: middle;
+  color: #111827;
+}
+
+.td-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+  font-size: 0.78rem;
+}
+
+.td-muted {
+  color: #6b7280;
+}
 
 /* Tags */
-.tag { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap; }
-.tag-cat     { background: var(--accent-dim);  color: var(--accent);  border: 1px solid rgba(37,99,235,0.2); }
-.tag-success { background: var(--success-dim); color: var(--success); border: 1px solid rgba(22,163,74,0.2); }
-.tag-fail    { background: var(--danger-dim);  color: var(--danger);  border: 1px solid rgba(220,38,38,0.2); }
+.tag {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.tag-cat {
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
+.tag-success {
+  background: rgba(22, 163, 74, 0.08);
+  color: #16a34a;
+  border: 1px solid rgba(22, 163, 74, 0.2);
+}
+
+.tag-fail {
+  background: rgba(220, 38, 38, 0.08);
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+}
 
 /* Pagination */
-.pagination { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 20px; }
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+
 .pag-btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  background: var(--surface); border: 1px solid var(--border);
-  color: var(--text-muted); border-radius: 6px; padding: 6px 13px;
-  font-size: 0.82rem; cursor: pointer; transition: color 0.15s, border-color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  border: 1px solid #dde2ea;
+  color: #6b7280;
+  border-radius: 6px;
+  padding: 6px 13px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
 }
-.pag-btn:hover:not(:disabled) { color: var(--text); border-color: var(--text-muted); }
-.pag-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.pag-pages { display: flex; gap: 4px; }
+
+.pag-btn:hover:not(:disabled) {
+  color: #111827;
+  border-color: #6b7280;
+}
+
+.pag-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pag-pages {
+  display: flex;
+  gap: 4px;
+}
+
 .pag-num {
-  width: 32px; height: 32px; border: 1px solid transparent; background: transparent;
-  border-radius: 6px; color: var(--text-muted); font-size: 0.82rem; cursor: pointer;
-  transition: all 0.15s; display: flex; align-items: center; justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 6px;
+  color: #6b7280;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.pag-num:hover:not(.ellipsis) { background: var(--surface); border-color: var(--border); color: var(--text); }
-.pag-num.active   { background: var(--accent); color: #fff; border-color: var(--accent); cursor: default; }
-.pag-num.ellipsis { cursor: default; }
+
+.pag-num:hover:not(.ellipsis) {
+  background: #ffffff;
+  border-color: #dde2ea;
+  color: #111827;
+}
+
+.pag-num.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  cursor: default;
+}
+
+.pag-num.ellipsis {
+  cursor: default;
+}
 </style>
