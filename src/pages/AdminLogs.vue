@@ -5,12 +5,20 @@ import type { StoredUser } from '../types/auth'
 
 type BackendLogResponse = {
   id: number
-  createdAt: string
+  timestamp: string
+  actorRef?: string
   sourceType: string
   event: string
   result: string
   description?: string
+  metadata?: string
+  createdByModule?: string
+  module?: string
 }
+
+type BackendLogsPayload =
+  | BackendLogResponse[]
+  | { data?: BackendLogResponse[]; content?: BackendLogResponse[]; logs?: BackendLogResponse[] }
 
 type LogRow = {
   id: string
@@ -68,16 +76,18 @@ async function fetchLogs() {
     const res = await fetch(API_URL)
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
 
-    const json: BackendLogResponse[] = await res.json()
-    const mapped = json.map<LogRow>((item) => ({
+    const payload: BackendLogsPayload = await res.json()
+    const logsList = extractLogs(payload)
+
+    const mapped = logsList.map<LogRow>((item) => ({
       id: String(item.id),
-      timestamp: item.createdAt,
+      timestamp: item.timestamp,
       origem: item.sourceType,
-      usuario: 'Pendente no backend',
+      usuario: item.actorRef?.trim() || 'Pendente no backend',
       evento: item.event,
       descricao: item.description ?? '',
       resultado: item.result === 'SUCCESS' ? 'SUCCESS' : 'FAIL',
-      moduloResponsavel: 'Pendente no backend',
+      moduloResponsavel: getModuleValue(item),
     }))
 
     allLogs.value = mapped
@@ -89,6 +99,22 @@ async function fetchLogs() {
   } finally {
     isLoading.value = false
   }
+}
+
+function extractLogs(payload: BackendLogsPayload) {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload.data)) return payload.data
+  if (Array.isArray(payload.content)) return payload.content
+  if (Array.isArray(payload.logs)) return payload.logs
+
+  throw new Error('Formato de resposta invalido para logs.')
+}
+
+function getModuleValue(item: BackendLogResponse) {
+  const direct = item.createdByModule?.trim() || item.module?.trim()
+  if (direct) return direct
+
+  return getModuleFromMetadata(item.metadata)
 }
 
 function applyFilters() {
@@ -124,6 +150,21 @@ function formatDate(dateStr: string) {
 
 function formatResult(result: string) {
   return result === 'SUCCESS' ? 'SUCCESS' : 'FAIL'
+}
+
+function getModuleFromMetadata(metadata?: string) {
+  if (!metadata?.trim()) return 'Pendente no backend'
+
+  try {
+    const parsed = JSON.parse(metadata) as Record<string, unknown>
+    const moduleValue = parsed.module ?? parsed.createdByModule
+    if (typeof moduleValue === 'string' && moduleValue.trim()) return moduleValue.trim()
+  } catch {
+    const moduleMatch = metadata.match(/(?:module|createdByModule)\s*[=:]\s*([\w.-]+)/i)
+    if (moduleMatch?.[1]) return moduleMatch[1]
+  }
+
+  return 'Pendente no backend'
 }
 
 function placeholderText(value: string) {
