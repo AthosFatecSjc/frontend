@@ -1,24 +1,12 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-
-import { createVuetify } from 'vuetify'
-import 'vuetify/styles'
-
-import '@mdi/font/css/materialdesignicons.css'
-
-import * as components from 'vuetify/components'
-import * as directives from 'vuetify/directives'
-
-const vuetify = createVuetify({
-  components,
-  directives
-})
-
+import uiPlugin from './plugins/ui'
 import router from './router'
+import './styles.css'
 
 const app = createApp(App)
 
 app.use(router)
-app.use(vuetify)
+app.use(uiPlugin)
 
 app.mount('#app')
