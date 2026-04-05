@@ -1,29 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+
 import AuthenticatedLayout from '../components/layout/AuthenticatedLayout.vue'
+import { fetchAdminLogs } from '../services/adminLogs'
 import type { StoredUser } from '../types/auth'
-
-type LogResponse = {
-  id: number
-  timestamp: string
-  actorRef?: string
-  sourceType: string
-  event: string
-  result: string
-  description?: string
-  metadata?: string
-  createdByModule?: string
-}
-
-type PageResponse = {
-  content: LogResponse[]
-  page: number
-  size: number
-  totalElements: number
-  totalPages: number
-  first: boolean
-  last: boolean
-}
+import type { AdminLogsFilters } from '../types/adminLogs'
 
 type LogRow = {
   id: string
@@ -36,7 +17,6 @@ type LogRow = {
   moduloResponsavel: string
 }
 
-const API_URL = '/api/admin/logs'
 const PAGE_SIZE = 10
 
 const EVENT_OPTIONS = [
@@ -48,7 +28,7 @@ const EVENT_OPTIONS = [
   { value: 'USER_REJECTED', label: 'Usuario rejeitado' },
   { value: 'USER_EDITED', label: 'Usuario editado' },
   { value: 'USER_ANONYMIZED', label: 'Usuario anonimizado' },
-  { value: 'USER_ANONYMIZATION_REAPPLIED', label: 'Reaplicacao de anonimiza\u00e7\u00e3o' },
+  { value: 'USER_ANONYMIZATION_REAPPLIED', label: 'Reaplicacao de anonimizacao' },
   { value: 'ADMIN_ROLE_GRANTED', label: 'Perfil admin concedido' },
   { value: 'ADMIN_ROLE_REMOVED', label: 'Perfil admin removido' },
   { value: 'BACKUP_RESTORE_RECONCILIATION', label: 'Reconciliacao de backup' },
@@ -62,6 +42,8 @@ const RESULT_OPTIONS = [
   { value: 'FAIL', label: 'Falha' },
 ] as const
 
+const eventLabelMap = Object.fromEntries(EVENT_OPTIONS.map((item) => [item.value, item.label]))
+
 const logs = ref<LogRow[]>([])
 const total = ref(0)
 const totalPages = ref(1)
@@ -70,29 +52,32 @@ const error = ref('')
 const isAdmin = ref(false)
 const currentPage = ref(1)
 
-const filters = ref({
+const filters = ref<Required<AdminLogsFilters>>({
   startDate: '',
   endDate: '',
   event: '',
   result: '',
 })
 
-const eventLabelMap = Object.fromEntries(EVENT_OPTIONS.map((item) => [item.value, item.label]))
-
-function toLocalDateTime(value: string, endOfDay = false) {
-  if (!value) return ''
-  return `${value}T${endOfDay ? '23:59:59' : '00:00:00'}`
-}
-
 const visiblePages = computed(() => {
-  const t = totalPages.value
-  const c = currentPage.value
-  if (t <= 7) return Array.from({ length: t }, (_, i) => i + 1)
+  const totalPageCount = totalPages.value
+  const page = currentPage.value
+
+  if (totalPageCount <= 7) {
+    return Array.from({ length: totalPageCount }, (_, index) => index + 1)
+  }
+
   const pages: (number | string)[] = [1]
-  if (c > 3) pages.push('...')
-  for (let i = Math.max(2, c - 1); i <= Math.min(t - 1, c + 1); i++) pages.push(i)
-  if (c < t - 2) pages.push('...')
-  pages.push(t)
+
+  if (page > 3) pages.push('...')
+
+  for (let index = Math.max(2, page - 1); index <= Math.min(totalPageCount - 1, page + 1); index++) {
+    pages.push(index)
+  }
+
+  if (page < totalPageCount - 2) pages.push('...')
+
+  pages.push(totalPageCount)
   return pages
 })
 
@@ -101,40 +86,16 @@ const paginationStart = computed(() => {
   return (currentPage.value - 1) * PAGE_SIZE + 1
 })
 
-const paginationEnd = computed(() => {
-  return Math.min(currentPage.value * PAGE_SIZE, total.value)
-})
+const paginationEnd = computed(() => Math.min(currentPage.value * PAGE_SIZE, total.value))
 
-function buildQueryParams(): URLSearchParams {
-  const params = new URLSearchParams()
-  params.append('page', String(currentPage.value - 1))
-  params.append('size', String(PAGE_SIZE))
-
-  if (filters.value.startDate && filters.value.endDate) {
-    params.append('startDate', toLocalDateTime(filters.value.startDate))
-    params.append('endDate', toLocalDateTime(filters.value.endDate, true))
-  }
-
-  if (filters.value.event) params.append('event', filters.value.event)
-  if (filters.value.result) params.append('result', filters.value.result)
-
-  return params
-}
-
-async function fetchLogs() {
+async function loadLogs() {
   isLoading.value = true
   error.value = ''
 
   try {
-    const params = buildQueryParams()
-    const url = `${API_URL}?${params.toString()}`
+    const pageResponse = await fetchAdminLogs(currentPage.value - 1, PAGE_SIZE, filters.value)
 
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-
-    const pageResponse: PageResponse = await res.json()
-
-    const mapped = pageResponse.content.map<LogRow>((item) => ({
+    logs.value = pageResponse.content.map<LogRow>((item) => ({
       id: String(item.id),
       timestamp: item.timestamp,
       origem: item.sourceType,
@@ -145,11 +106,10 @@ async function fetchLogs() {
       moduloResponsavel: item.createdByModule?.trim() || '-',
     }))
 
-    logs.value = mapped
     total.value = pageResponse.totalElements
-    totalPages.value = pageResponse.totalPages
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Erro inesperado ao carregar logs.'
+    totalPages.value = pageResponse.totalPages || 1
+  } catch (exception) {
+    error.value = exception instanceof Error ? exception.message : 'Erro inesperado ao carregar logs.'
     logs.value = []
     total.value = 0
     totalPages.value = 1
@@ -170,33 +130,36 @@ function applyFilters() {
   }
 
   currentPage.value = 1
-  fetchLogs()
+  void loadLogs()
 }
 
 function clearFilters() {
-  filters.value = { startDate: '', endDate: '', event: '', result: '' }
+  filters.value = {
+    startDate: '',
+    endDate: '',
+    event: '',
+    result: '',
+  }
   error.value = ''
   currentPage.value = 1
-  fetchLogs()
+  void loadLogs()
 }
 
 function prevPage() {
-  if (currentPage.value > 1) {
-    currentPage.value--
-    fetchLogs()
-  }
+  if (currentPage.value <= 1) return
+  currentPage.value--
+  void loadLogs()
 }
 
 function nextPage() {
-  if (currentPage.value < totalPages.value) {
-    currentPage.value++
-    fetchLogs()
-  }
+  if (currentPage.value >= totalPages.value) return
+  currentPage.value++
+  void loadLogs()
 }
 
-function goToPage(p: number) {
-  currentPage.value = p
-  fetchLogs()
+function goToPage(page: number) {
+  currentPage.value = page
+  void loadLogs()
 }
 
 function formatDate(dateStr: string) {
@@ -220,46 +183,47 @@ function formatEvent(event: string) {
 
 function checkAdmin() {
   const userStr = localStorage.getItem('currentUser')
-  if (userStr) {
-    const user: StoredUser = JSON.parse(userStr)
-    isAdmin.value = user.role === 'ADMIN'
-  }
+  if (!userStr) return
+
+  const user: StoredUser = JSON.parse(userStr)
+  isAdmin.value = user.role === 'ADMIN'
 }
 
 onMounted(() => {
   checkAdmin()
-  if (isAdmin.value) fetchLogs()
+
+  if (isAdmin.value) {
+    void loadLogs()
+  }
 })
 </script>
 
 <template>
   <AuthenticatedLayout
     title="Logs e Auditoria"
-    description="Consulta de eventos críticos da plataforma para monitoramento técnico e rastreabilidade administrativa"
+    description="Consulta de eventos criticos da plataforma para monitoramento tecnico e rastreabilidade administrativa"
   >
-    <!-- Acesso restrito -->
     <div v-if="!isAdmin" class="state-container state-restricted">
       <div class="state-icon">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
       </div>
       <p class="state-title">Acesso restrito</p>
-      <p class="state-text">Área acessível apenas por administradores autorizados.</p>
+      <p class="state-text">Area acessivel apenas por administradores autorizados.</p>
     </div>
 
     <template v-else>
-      <!-- Filters -->
-      <div class="filters-panel">
+      <UiCard class="filters-panel">
         <div class="filters-grid">
           <div class="field-group">
-            <label class="field-label">Data inicial</label>
-            <input type="date" v-model="filters.startDate" class="field-input" />
+            <UiLabel class="field-label">Data inicial</UiLabel>
+            <UiInput v-model="filters.startDate" type="date" class="field-input" />
           </div>
           <div class="field-group">
-            <label class="field-label">Data final</label>
-            <input type="date" v-model="filters.endDate" class="field-input" />
+            <UiLabel class="field-label">Data final</UiLabel>
+            <UiInput v-model="filters.endDate" type="date" class="field-input" />
           </div>
           <div class="field-group">
-            <label class="field-label">Evento</label>
+            <UiLabel class="field-label">Evento</UiLabel>
             <select v-model="filters.event" class="field-input">
               <option value="">Todos os eventos</option>
               <option v-for="option in EVENT_OPTIONS" :key="option.value" :value="option.value">
@@ -268,7 +232,7 @@ onMounted(() => {
             </select>
           </div>
           <div class="field-group">
-            <label class="field-label">Resultado</label>
+            <UiLabel class="field-label">Resultado</UiLabel>
             <select v-model="filters.result" class="field-input">
               <option value="">Todos os resultados</option>
               <option v-for="option in RESULT_OPTIONS" :key="option.value" :value="option.value">
@@ -277,99 +241,97 @@ onMounted(() => {
             </select>
           </div>
           <div class="field-group field-group--action">
-            <button class="btn-apply" @click="applyFilters">
+            <UiButton class="btn-apply" @click="applyFilters">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               Filtrar
-            </button>
-            <button class="btn-clear" @click="clearFilters">
+            </UiButton>
+            <UiButton class="btn-clear" variant="secondary" @click="clearFilters">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
               Limpar
-            </button>
+            </UiButton>
           </div>
         </div>
-      </div>
+      </UiCard>
 
-      <!-- Loading -->
       <div v-if="isLoading" class="state-container">
         <div class="spinner"></div>
         <p class="state-text">Carregando registros...</p>
       </div>
 
-      <!-- Error -->
-      <div v-if="error" class="state-container state-error">
-        <div class="state-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+      <UiAlert v-if="error" tone="danger" class="alert-inline">
+        <div class="alert-inline__content">
+          <div>
+            <p class="state-title">Erro ao carregar</p>
+            <p class="state-text">{{ error }}</p>
+          </div>
+          <UiButton class="btn-clear-inline" variant="secondary" @click="loadLogs">Tentar novamente</UiButton>
         </div>
-        <p class="state-title">Erro ao carregar</p>
-        <p class="state-text">{{ error }}</p>
-        <button class="btn-clear-inline" @click="fetchLogs">Tentar novamente</button>
-      </div>
+      </UiAlert>
 
-      <!-- Empty -->
       <div v-if="!isLoading && total === 0 && !error" class="state-container state-empty">
         <div class="state-icon">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         </div>
         <p class="state-title">Nenhum registro encontrado</p>
         <p class="state-text">Tente ajustar os filtros para ampliar a busca.</p>
-        <button class="btn-clear-inline" @click="clearFilters">Limpar filtros</button>
+        <UiButton class="btn-clear-inline" variant="secondary" @click="clearFilters">Limpar filtros</UiButton>
       </div>
 
-      <!-- Table -->
-      <div v-if="!isLoading && logs.length > 0" class="table-wrapper">
+      <UiCard v-if="!isLoading && logs.length > 0" class="table-wrapper">
         <table class="logs-table">
           <thead>
             <tr>
               <th>Data / Hora</th>
               <th>Origem</th>
-              <th>Usuário</th>
+              <th>Usuario</th>
               <th>Evento</th>
-              <th>Descrição</th>
+              <th>Descricao</th>
               <th>Status</th>
-              <th>Módulo responsável</th>
+              <th>Modulo responsavel</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="log in logs" :key="log.id">
               <td class="td-mono">{{ formatDate(log.timestamp) }}</td>
-              <td><span class="tag tag-source">{{ log.origem }}</span></td>
+              <td><UiBadge class="tag-source">{{ log.origem }}</UiBadge></td>
               <td class="td-placeholder">{{ log.usuario }}</td>
               <td>{{ formatEvent(log.evento) }}</td>
               <td class="td-description">{{ log.descricao }}</td>
               <td>
-                <span class="tag" :class="log.resultado === 'SUCCESS' ? 'tag-success' : 'tag-fail'">
+                <UiBadge :tone="log.resultado === 'SUCCESS' ? 'success' : 'danger'">
                   {{ formatResult(log.resultado) }}
-                </span>
+                </UiBadge>
               </td>
               <td class="td-placeholder">{{ log.moduloResponsavel }}</td>
             </tr>
           </tbody>
         </table>
-      </div>
+      </UiCard>
 
-      <!-- Pagination -->
       <div v-if="!isLoading && totalPages > 1" class="pagination-section">
         <div class="pagination-info">
           Mostrando {{ paginationStart }} a {{ paginationEnd }} de {{ total }} registros
         </div>
         <div class="pagination">
-          <button class="pag-btn" @click="prevPage" :disabled="currentPage === 1">
+          <UiButton class="pag-btn" variant="secondary" :disabled="currentPage === 1" @click="prevPage">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
             Anterior
-          </button>
+          </UiButton>
           <div class="pag-pages">
             <button
-              v-for="p in visiblePages"
-              :key="p"
+              v-for="page in visiblePages"
+              :key="page"
               class="pag-num"
-              :class="{ active: p === currentPage, ellipsis: p === '...' }"
-              @click="typeof p === 'number' ? goToPage(p) : null"
-            >{{ p }}</button>
+              :class="{ active: page === currentPage, ellipsis: page === '...' }"
+              @click="typeof page === 'number' ? goToPage(page) : null"
+            >
+              {{ page }}
+            </button>
           </div>
-          <button class="pag-btn" @click="nextPage" :disabled="currentPage === totalPages">
-            Próxima
+          <UiButton class="pag-btn" variant="secondary" :disabled="currentPage === totalPages" @click="nextPage">
+            Proxima
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
+          </UiButton>
         </div>
       </div>
     </template>
@@ -377,11 +339,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Filters */
 .filters-panel {
-  background: #ffffff;
-  border: 1px solid #dde2ea;
-  border-radius: 8px;
   padding: 18px 20px;
   margin-bottom: 20px;
 }
@@ -397,6 +355,7 @@ onMounted(() => {
   .filters-grid {
     grid-template-columns: 1fr 1fr;
   }
+
   .field-group--action {
     grid-column: 1 / -1;
     justify-content: flex-start;
@@ -426,25 +385,31 @@ onMounted(() => {
 }
 
 .field-label {
-  font-size: 0.72rem;
-  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #6b7280;
 }
 
 .field-input {
-  background: #f5f7fa;
   border: 1px solid #dde2ea;
-  color: #111827;
-  border-radius: 6px;
-  padding: 7px 10px;
   font-size: 0.85rem;
-  outline: none;
-  transition: border-color 0.15s;
+  color-scheme: light;
+}
+
+.field-input.ui-input {
+  min-height: 2.6rem;
+  border-radius: 0.9rem;
+}
+
+.field-input:not(.ui-input) {
   width: 100%;
   box-sizing: border-box;
-  color-scheme: light;
+  background: #eefcff;
+  color: #111827;
+  border-radius: 1rem;
+  padding: 0.8rem 0.9rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .field-input:focus {
@@ -453,59 +418,19 @@ onMounted(() => {
 }
 
 .btn-apply {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: #2563eb;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 12px;
-  min-width: 96px;
-  flex: 0 0 auto;
-  min-height: 36px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
+  width: auto;
+  min-width: 120px;
+  min-height: 2.6rem;
   white-space: nowrap;
-  transition: background 0.15s, transform 0.1s;
-}
-
-.btn-apply:hover {
-  background: #1d4ed8;
-}
-
-.btn-apply:active {
-  transform: scale(0.97);
 }
 
 .btn-clear {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: transparent;
-  color: #6b7280;
-  border: 1px solid #dde2ea;
-  border-radius: 6px;
-  padding: 8px 12px;
-  min-width: 96px;
-  flex: 0 0 auto;
-  min-height: 36px;
-  font-size: 0.85rem;
-  cursor: pointer;
+  width: auto;
+  min-width: 120px;
+  min-height: 2.6rem;
   white-space: nowrap;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.btn-clear:hover {
-  color: #111827;
-  border-color: #6b7280;
-  background: #f8fafc;
-}
-
-/* States */
 .state-container {
   display: flex;
   flex-direction: column;
@@ -579,26 +504,12 @@ onMounted(() => {
 }
 
 .btn-clear-inline {
-  margin-top: 6px;
-  background: transparent;
-  border: 1px solid #dde2ea;
-  color: #6b7280;
-  border-radius: 6px;
-  padding: 6px 14px;
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  width: auto;
+  min-height: 2.4rem;
+  padding: 0.4rem 0.9rem;
 }
 
-.btn-clear-inline:hover {
-  color: #111827;
-  border-color: #6b7280;
-}
-
-/* Table */
 .table-wrapper {
-  border: 1px solid #dde2ea;
-  border-radius: 8px;
   overflow: hidden;
   overflow-x: auto;
   margin-bottom: 20px;
@@ -669,36 +580,12 @@ onMounted(() => {
   font-size: 0.78rem;
 }
 
-/* Tags */
-.tag {
-  display: inline-block;
-  padding: 2px 9px;
-  border-radius: 20px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
 .tag-source {
-  background: rgba(15, 23, 42, 0.06);
-  color: #334155;
-  border: 1px solid rgba(100, 116, 139, 0.22);
+  min-height: 1.8rem;
+  padding: 0.2rem 0.7rem;
+  letter-spacing: 0.04em;
 }
 
-.tag-success {
-  background: rgba(22, 163, 74, 0.08);
-  color: #16a34a;
-  border: 1px solid rgba(22, 163, 74, 0.2);
-}
-
-.tag-fail {
-  background: rgba(220, 38, 38, 0.08);
-  color: #dc2626;
-  border: 1px solid rgba(220, 38, 38, 0.2);
-}
-
-/* Pagination */
 .pagination-section {
   display: flex;
   flex-direction: column;
@@ -720,27 +607,10 @@ onMounted(() => {
 }
 
 .pag-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: #ffffff;
-  border: 1px solid #dde2ea;
-  color: #6b7280;
-  border-radius: 6px;
-  padding: 6px 13px;
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.pag-btn:hover:not(:disabled) {
-  color: #111827;
-  border-color: #6b7280;
-}
-
-.pag-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
+  width: auto;
+  min-width: 120px;
+  min-height: 2.4rem;
+  padding: 0.45rem 0.85rem;
 }
 
 .pag-pages {
@@ -778,5 +648,23 @@ onMounted(() => {
 
 .pag-num.ellipsis {
   cursor: default;
+}
+
+.alert-inline {
+  margin-bottom: 20px;
+}
+
+.alert-inline__content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .alert-inline__content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

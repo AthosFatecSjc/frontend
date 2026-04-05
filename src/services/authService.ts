@@ -38,6 +38,25 @@ function appendLog(entry: LogEntry) {
   localStorage.setItem(STORAGE.logs, JSON.stringify(logs))
 }
 
+function createAuthLog(entry: {
+  actorRef: string
+  evento: string
+  resultado: string
+  details?: string
+}): LogEntry {
+  return {
+    id: Date.now().toString(),
+    timestamp: new Date().toISOString(),
+    categoria: 'AUTENTICACAO',
+    evento: entry.evento,
+    resultado: entry.resultado,
+    origem: 'LOGIN',
+    actorRef: entry.actorRef,
+    modulo: 'authService',
+    details: entry.details,
+  }
+}
+
 export async function loginWithStorage(email: string, senha: string): Promise<LoginResult> {
   const users = readUsers()
 
@@ -45,14 +64,12 @@ export async function loginWithStorage(email: string, senha: string): Promise<Lo
   const user = users.find(currentUser => currentUser.email === email && currentUser.senhaHash === senha)
 
   if (!user) {
-    appendLog({
-      id: Date.now().toString(),
-      userId: 'unknown',
-      userName: email,
-      action: 'Tentativa de login',
-      timestamp: new Date().toISOString(),
+    appendLog(createAuthLog({
+      actorRef: email,
+      evento: 'LOGIN_ATTEMPT',
+      resultado: 'FAIL',
       details: 'Login falhou',
-    })
+    }))
 
     return {
       type: 'invalid',
@@ -76,14 +93,12 @@ export async function loginWithStorage(email: string, senha: string): Promise<Lo
   }
 
   if (user.status !== 'ATIVO') {
-    appendLog({
-      id: Date.now().toString(),
-      userId: 'unknown',
-      userName: email,
-      action: 'Tentativa de login',
-      timestamp: new Date().toISOString(),
+    appendLog(createAuthLog({
+      actorRef: email,
+      evento: 'LOGIN_ATTEMPT',
+      resultado: 'FAIL',
       details: 'Login falhou',
-    })
+    }))
 
     return {
       type: 'invalid',
@@ -93,13 +108,11 @@ export async function loginWithStorage(email: string, senha: string): Promise<Lo
 
   localStorage.setItem(STORAGE.currentUser, JSON.stringify(user))
 
-  appendLog({
-    id: Date.now().toString(),
-    userId: user.id,
-    userName: user.nome,
-    action: 'Login realizado',
-    timestamp: new Date().toISOString(),
-  })
+  appendLog(createAuthLog({
+    actorRef: user.nome,
+    evento: 'LOGIN_SUCCESS',
+    resultado: 'SUCCESS',
+  }))
 
   return {
     type: 'success',
