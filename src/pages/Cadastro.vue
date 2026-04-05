@@ -130,15 +130,13 @@ function goToLogin() {
       </div>
     </header>
 
-    <main class="login-main">
+    <!-- 👇 classe nova -->
+    <main class="login-main spaced">
       <UiCard class="login-card">
         <header class="login-head">
-          <AppHeading
-            eyebrow="Cadastro"
-            title="Solicitar acesso à plataforma"
+          <AppHeading eyebrow="Cadastro" title="Solicitar acesso à plataforma"
             subtitle="Preencha seus dados para solicitar acesso. Seu cadastro será analisado por um administrador."
-            size="lg"
-          />
+            size="lg" />
         </header>
 
         <form class="login-form" @submit.prevent="onSubmit">
@@ -154,19 +152,22 @@ function goToLogin() {
 
           <div class="login-field">
             <UiLabel>E-mail *</UiLabel>
-            <UiInput v-model="email" type="email" placeholder="seu.email@empresa.com" :class="{ 'input-error': errors.email }" />
+            <UiInput v-model="email" type="email" placeholder="seu.email@empresa.com"
+              :class="{ 'input-error': errors.email }" />
             <small v-if="errors.email" class="error-text">{{ errors.email }}</small>
           </div>
 
           <div class="login-field">
             <UiLabel>Senha *</UiLabel>
-            <UiInput v-model="senha" type="password" placeholder="Digite sua senha" :class="{ 'input-error': errors.senha }" />
+            <UiInput v-model="senha" type="password" placeholder="Digite sua senha"
+              :class="{ 'input-error': errors.senha }" />
             <small v-if="errors.senha" class="error-text">{{ errors.senha }}</small>
           </div>
 
           <div class="login-field">
             <UiLabel>Confirmar senha *</UiLabel>
-            <UiInput v-model="confirmarSenha" type="password" placeholder="Confirme sua senha" :class="{ 'input-error': errors.confirmarSenha }" />
+            <UiInput v-model="confirmarSenha" type="password" placeholder="Confirme sua senha"
+              :class="{ 'input-error': errors.confirmarSenha }" />
             <small v-if="errors.confirmarSenha" class="error-text">{{ errors.confirmarSenha }}</small>
           </div>
 
@@ -177,29 +178,31 @@ function goToLogin() {
           </div>
 
           <div class="terms-block">
-            <label>
+            <label class="term-item">
               <input type="checkbox" v-model="aceitaTermo" />
-              Li e aceito o
-              <a href="/termos" target="_blank">Termo de Uso</a>
+              <span>
+                Li e aceito o
+                <a href="/termos" target="_blank">Termo de Uso</a>
+              </span>
             </label>
 
-            <label>
+            <label class="term-item">
               <input type="checkbox" v-model="aceitaPrivacidade" />
-              Li o
-              <a href="/privacidade" target="_blank">Aviso de Privacidade</a>
+              <span>
+                Li o
+                <a href="/privacidade" target="_blank">Aviso de Privacidade</a>
+              </span>
             </label>
 
-            <label>
+            <label class="term-item">
               <input type="checkbox" v-model="aceitaMarketing" />
-              Aceito receber comunicações e novidades por e-mail
+              <span>
+                Aceito receber comunicações e novidades por e-mail
+              </span>
             </label>
           </div>
 
-          <UiButton
-            class="login-submit"
-            type="submit"
-            :disabled="isSubmitDisabled"
-          >
+          <UiButton class="login-submit" type="submit" :disabled="isSubmitDisabled">
             {{ submitText }}
             <span aria-hidden="true">&#8594;</span>
           </UiButton>
@@ -225,6 +228,17 @@ function goToLogin() {
 <style scoped src="../styles/login-screen.css"></style>
 
 <style scoped>
+.spaced {
+  margin-top: 48px;
+}
+
+
+@media (min-width: 768px) {
+  .spaced {
+    margin-top: 72px;
+  }
+}
+
 .input-error {
   border: 1px solid #ef4444 !important;
 }
@@ -234,5 +248,31 @@ function goToLogin() {
   font-size: 12px;
   margin-top: 4px;
 }
+
+.terms-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.term-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.term-item input {
+  margin-top: 3px;
+}
+
+.term-item a {
+  color: #2563eb;
+  text-decoration: underline;
+  font-weight: 500;
+}
+
 </style>
 ```
