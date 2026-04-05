@@ -1,12 +1,32 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import AuthenticatedLayout from '../components/layout/AuthenticatedLayout.vue'
-import type { LogEntry, StoredUser } from '../types/auth'
+import type { StoredUser } from '../types/auth'
 
-const API_URL = '/api/energia/system-logs'
+type BackendLogResponse = {
+  id: number
+  createdAt: string
+  sourceType: string
+  event: string
+  result: string
+  description?: string
+}
+
+type LogRow = {
+  id: string
+  timestamp: string
+  origem: string
+  usuario: string
+  evento: string
+  descricao: string
+  resultado: string
+  moduloResponsavel: string
+}
+
+const API_URL = '/api/admin/logs'
 const PAGE_SIZE = 50
 
-const logs = ref<LogEntry[]>([])
+const allLogs = ref<LogRow[]>([])
 const total = ref(0)
 const isLoading = ref(false)
 const error = ref('')
@@ -21,6 +41,12 @@ const filters = ref({
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
+
+const logs = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  const end = start + PAGE_SIZE
+  return allLogs.value.slice(start, end)
+})
 
 const visiblePages = computed(() => {
   const t = totalPages.value
@@ -38,25 +64,27 @@ async function fetchLogs() {
   isLoading.value = true
   error.value = ''
 
-  const params = new URLSearchParams({
-    page:     String(currentPage.value),
-    pageSize: String(PAGE_SIZE),
-  })
-  if (filters.value.startDate) params.set('startDate', filters.value.startDate)
-  if (filters.value.endDate)   params.set('endDate',   filters.value.endDate)
-  if (filters.value.evento)    params.set('evento',    filters.value.evento)
-  if (filters.value.resultado) params.set('resultado', filters.value.resultado)
-
   try {
-    const res = await fetch(`${API_URL}?${params.toString()}`)
+    const res = await fetch(API_URL)
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
 
-    const json: { data: LogEntry[]; total: number } = await res.json()
-    logs.value  = json.data
-    total.value = json.total
+    const json: BackendLogResponse[] = await res.json()
+    const mapped = json.map<LogRow>((item) => ({
+      id: String(item.id),
+      timestamp: item.createdAt,
+      origem: item.sourceType,
+      usuario: 'Pendente no backend',
+      evento: item.event,
+      descricao: item.description ?? '',
+      resultado: item.result === 'SUCCESS' ? 'SUCCESS' : 'FAIL',
+      moduloResponsavel: 'Pendente no backend',
+    }))
+
+    allLogs.value = mapped
+    total.value = mapped.length
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Erro inesperado ao carregar logs.'
-    logs.value  = []
+    allLogs.value  = []
     total.value = 0
   } finally {
     isLoading.value = false
@@ -92,6 +120,14 @@ function formatDate(dateStr: string) {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
   })
+}
+
+function formatResult(result: string) {
+  return result === 'SUCCESS' ? 'SUCCESS' : 'FAIL'
+}
+
+function placeholderText(value: string) {
+  return value
 }
 
 function checkAdmin() {
@@ -202,27 +238,27 @@ onMounted(() => {
           <thead>
             <tr>
               <th>Data / Hora</th>
-              <th>Categoria</th>
-              <th>Evento</th>
-              <th>Resultado</th>
               <th>Origem</th>
-              <th>Actor Ref</th>
-              <th>Modulo</th>
+              <th>Usuario</th>
+              <th>Evento</th>
+              <th>Descricao</th>
+              <th>Status</th>
+              <th>Modulo responsavel</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="log in logs" :key="log.id">
               <td class="td-mono">{{ formatDate(log.timestamp) }}</td>
-              <td><span class="tag tag-cat">{{ log.categoria }}</span></td>
+              <td><span class="tag tag-source">{{ log.origem }}</span></td>
+              <td class="td-placeholder">{{ placeholderText(log.usuario) }}</td>
               <td>{{ log.evento }}</td>
+              <td class="td-description">{{ log.descricao }}</td>
               <td>
-                <span class="tag" :class="log.resultado === 'Sucesso' ? 'tag-success' : 'tag-fail'">
-                  {{ log.resultado }}
+                <span class="tag" :class="log.resultado === 'SUCCESS' ? 'tag-success' : 'tag-fail'">
+                  {{ formatResult(log.resultado) }}
                 </span>
               </td>
-              <td class="td-mono td-muted">{{ log.origem }}</td>
-              <td class="td-mono td-muted">{{ log.actorRef }}</td>
-              <td>{{ log.modulo }}</td>
+              <td class="td-placeholder">{{ placeholderText(log.moduloResponsavel) }}</td>
             </tr>
           </tbody>
         </table>
@@ -373,6 +409,12 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.integration-note {
+  margin: 0 0 14px;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
 /* States */
 .state-container {
   display: flex;
@@ -519,6 +561,18 @@ onMounted(() => {
   color: #111827;
 }
 
+.td-description {
+  color: #475569;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.td-placeholder {
+  color: #94a3b8;
+  font-style: italic;
+  white-space: nowrap;
+}
+
 .td-mono {
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
   font-size: 0.78rem;
@@ -539,10 +593,10 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-.tag-cat {
-  background: rgba(37, 99, 235, 0.08);
-  color: #2563eb;
-  border: 1px solid rgba(37, 99, 235, 0.2);
+.tag-source {
+  background: rgba(15, 23, 42, 0.06);
+  color: #334155;
+  border: 1px solid rgba(100, 116, 139, 0.22);
 }
 
 .tag-success {
