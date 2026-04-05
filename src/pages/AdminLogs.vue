@@ -39,6 +39,29 @@ type LogRow = {
 const API_URL = '/api/admin/logs'
 const PAGE_SIZE = 10
 
+const EVENT_OPTIONS = [
+  { value: 'LOGIN_ATTEMPT', label: 'Tentativa de login' },
+  { value: 'LOGIN_SUCCESS', label: 'Login com sucesso' },
+  { value: 'LOGIN_FAIL', label: 'Falha no login' },
+  { value: 'USER_REGISTER', label: 'Cadastro de usuario' },
+  { value: 'USER_APPROVED', label: 'Usuario aprovado' },
+  { value: 'USER_REJECTED', label: 'Usuario rejeitado' },
+  { value: 'USER_EDITED', label: 'Usuario editado' },
+  { value: 'USER_ANONYMIZED', label: 'Usuario anonimizado' },
+  { value: 'USER_ANONYMIZATION_REAPPLIED', label: 'Reaplicacao de anonimiza\u00e7\u00e3o' },
+  { value: 'ADMIN_ROLE_GRANTED', label: 'Perfil admin concedido' },
+  { value: 'ADMIN_ROLE_REMOVED', label: 'Perfil admin removido' },
+  { value: 'BACKUP_RESTORE_RECONCILIATION', label: 'Reconciliacao de backup' },
+  { value: 'ANEEL_EXTRACTION_START', label: 'Extracao ANEEL iniciada' },
+  { value: 'ANEEL_EXTRACTION_SUCCESS', label: 'Extracao ANEEL com sucesso' },
+  { value: 'ANEEL_EXTRACTION_FAIL', label: 'Falha na extracao ANEEL' },
+] as const
+
+const RESULT_OPTIONS = [
+  { value: 'SUCCESS', label: 'Sucesso' },
+  { value: 'FAIL', label: 'Falha' },
+] as const
+
 const logs = ref<LogRow[]>([])
 const total = ref(0)
 const totalPages = ref(1)
@@ -50,9 +73,16 @@ const currentPage = ref(1)
 const filters = ref({
   startDate: '',
   endDate: '',
-  evento: '',
-  resultado: '',
+  event: '',
+  result: '',
 })
+
+const eventLabelMap = Object.fromEntries(EVENT_OPTIONS.map((item) => [item.value, item.label]))
+
+function toLocalDateTime(value: string, endOfDay = false) {
+  if (!value) return ''
+  return `${value}T${endOfDay ? '23:59:59' : '00:00:00'}`
+}
 
 const visiblePages = computed(() => {
   const t = totalPages.value
@@ -80,10 +110,13 @@ function buildQueryParams(): URLSearchParams {
   params.append('page', String(currentPage.value - 1))
   params.append('size', String(PAGE_SIZE))
 
-  if (filters.value.startDate) params.append('startDate', filters.value.startDate)
-  if (filters.value.endDate) params.append('endDate', filters.value.endDate)
-  if (filters.value.evento) params.append('event', filters.value.evento)
-  if (filters.value.resultado) params.append('result', filters.value.resultado)
+  if (filters.value.startDate && filters.value.endDate) {
+    params.append('startDate', toLocalDateTime(filters.value.startDate))
+    params.append('endDate', toLocalDateTime(filters.value.endDate, true))
+  }
+
+  if (filters.value.event) params.append('event', filters.value.event)
+  if (filters.value.result) params.append('result', filters.value.result)
 
   return params
 }
@@ -126,12 +159,23 @@ async function fetchLogs() {
 }
 
 function applyFilters() {
+  if ((filters.value.startDate && !filters.value.endDate) || (!filters.value.startDate && filters.value.endDate)) {
+    error.value = 'Preencha data inicial e final para aplicar o filtro por periodo.'
+    return
+  }
+
+  if (filters.value.startDate && filters.value.endDate && filters.value.startDate > filters.value.endDate) {
+    error.value = 'A data inicial nao pode ser maior que a data final.'
+    return
+  }
+
   currentPage.value = 1
   fetchLogs()
 }
 
 function clearFilters() {
-  filters.value = { startDate: '', endDate: '', evento: '', resultado: '' }
+  filters.value = { startDate: '', endDate: '', event: '', result: '' }
+  error.value = ''
   currentPage.value = 1
   fetchLogs()
 }
@@ -170,6 +214,10 @@ function formatResult(result: string) {
   return result === 'SUCCESS' ? 'SUCCESS' : 'FAIL'
 }
 
+function formatEvent(event: string) {
+  return eventLabelMap[event] ?? event
+}
+
 function checkAdmin() {
   const userStr = localStorage.getItem('currentUser')
   if (userStr) {
@@ -199,8 +247,8 @@ onMounted(() => {
     </div>
 
     <template v-else>
-      <!-- Filters (ocultos temporariamente) -->
-      <div class="filters-panel hidden">
+      <!-- Filters -->
+      <div class="filters-panel">
         <div class="filters-grid">
           <div class="field-group">
             <label class="field-label">Data inicial</label>
@@ -212,18 +260,20 @@ onMounted(() => {
           </div>
           <div class="field-group">
             <label class="field-label">Evento</label>
-            <select v-model="filters.evento" class="field-input">
+            <select v-model="filters.event" class="field-input">
               <option value="">Todos os eventos</option>
-              <option value="Login realizado">Login realizado</option>
-              <option value="Tentativa de login">Tentativa de login</option>
+              <option v-for="option in EVENT_OPTIONS" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
             </select>
           </div>
           <div class="field-group">
             <label class="field-label">Resultado</label>
-            <select v-model="filters.resultado" class="field-input">
+            <select v-model="filters.result" class="field-input">
               <option value="">Todos os resultados</option>
-              <option value="Sucesso">Sucesso</option>
-              <option value="Falha">Falha</option>
+              <option v-for="option in RESULT_OPTIONS" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
             </select>
           </div>
           <div class="field-group field-group--action">
@@ -231,7 +281,10 @@ onMounted(() => {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               Filtrar
             </button>
-            <button class="btn-clear" @click="clearFilters">Limpar</button>
+            <button class="btn-clear" @click="clearFilters">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+              Limpar
+            </button>
           </div>
         </div>
       </div>
@@ -289,7 +342,7 @@ onMounted(() => {
               <td class="td-mono">{{ formatDate(log.timestamp) }}</td>
               <td><span class="tag tag-source">{{ log.origem }}</span></td>
               <td class="td-placeholder">{{ log.usuario }}</td>
-              <td>{{ log.evento }}</td>
+              <td>{{ formatEvent(log.evento) }}</td>
               <td class="td-description">{{ log.descricao }}</td>
               <td>
                 <span class="tag" :class="log.resultado === 'SUCCESS' ? 'tag-success' : 'tag-fail'">
@@ -341,13 +394,9 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-.filters-panel.hidden {
-  display: none;
-}
-
 .filters-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr 1fr 1fr minmax(210px, auto);
   gap: 12px;
   align-items: end;
 }
@@ -358,6 +407,14 @@ onMounted(() => {
   }
   .field-group--action {
     grid-column: 1 / -1;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .field-group--action .btn-apply,
+  .field-group--action .btn-clear {
+    flex: 1 1 140px;
+    justify-content: center;
   }
 }
 
@@ -369,8 +426,11 @@ onMounted(() => {
 
 .field-group--action {
   display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   gap: 8px;
-  align-items: flex-end;
+  align-items: stretch;
+  justify-content: flex-end;
 }
 
 .field-label {
@@ -403,12 +463,16 @@ onMounted(() => {
 .btn-apply {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   background: #2563eb;
   color: #fff;
   border: none;
   border-radius: 6px;
-  padding: 8px 16px;
+  padding: 8px 12px;
+  min-width: 96px;
+  flex: 0 0 auto;
+  min-height: 36px;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
@@ -425,20 +489,28 @@ onMounted(() => {
 }
 
 .btn-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   background: transparent;
   color: #6b7280;
   border: 1px solid #dde2ea;
   border-radius: 6px;
-  padding: 8px 14px;
+  padding: 8px 12px;
+  min-width: 96px;
+  flex: 0 0 auto;
+  min-height: 36px;
   font-size: 0.85rem;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .btn-clear:hover {
   color: #111827;
   border-color: #6b7280;
+  background: #f8fafc;
 }
 
 /* Results bar */
