@@ -83,7 +83,7 @@ async function fetchLogs() {
       id: String(item.id),
       timestamp: item.timestamp,
       origem: item.sourceType,
-      usuario: item.actorRef?.trim() || 'Pendente no backend',
+      usuario: item.actorRef?.trim() || '',
       evento: item.event,
       descricao: item.description ?? '',
       resultado: item.result === 'SUCCESS' ? 'SUCCESS' : 'FAIL',
@@ -153,7 +153,7 @@ function formatResult(result: string) {
 }
 
 function getModuleFromMetadata(metadata?: string) {
-  if (!metadata?.trim()) return 'Pendente no backend'
+  if (!metadata?.trim()) return ''
 
   try {
     const parsed = JSON.parse(metadata) as Record<string, unknown>
@@ -164,11 +164,7 @@ function getModuleFromMetadata(metadata?: string) {
     if (moduleMatch?.[1]) return moduleMatch[1]
   }
 
-  return 'Pendente no backend'
-}
-
-function placeholderText(value: string) {
-  return value
+  return ''
 }
 
 function checkAdmin() {
@@ -291,7 +287,7 @@ onMounted(() => {
             <tr v-for="log in logs" :key="log.id">
               <td class="td-mono">{{ formatDate(log.timestamp) }}</td>
               <td><span class="tag tag-source">{{ log.origem }}</span></td>
-              <td class="td-placeholder">{{ placeholderText(log.usuario) }}</td>
+              <td class="td-placeholder">{{ log.usuario }}</td>
               <td>{{ log.evento }}</td>
               <td class="td-description">{{ log.descricao }}</td>
               <td>
@@ -299,7 +295,7 @@ onMounted(() => {
                   {{ formatResult(log.resultado) }}
                 </span>
               </td>
-              <td class="td-placeholder">{{ placeholderText(log.moduloResponsavel) }}</td>
+              <td class="td-placeholder">{{ log.moduloResponsavel }}</td>
             </tr>
           </tbody>
         </table>
