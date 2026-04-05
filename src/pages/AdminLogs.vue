@@ -305,14 +305,6 @@ onMounted(() => {
         <button class="btn-clear-inline" @click="fetchLogs">Tentar novamente</button>
       </div>
 
-      <!-- Results bar -->
-      <div v-if="!isLoading && !error" class="results-bar">
-        <span class="results-count">
-          <strong>{{ total }}</strong>
-          {{ total === 1 ? 'registro crítico monitorado' : 'registros críticos monitorados' }}
-        </span>
-      </div>
-
       <!-- Empty -->
       <div v-if="!isLoading && total === 0 && !error" class="state-container state-empty">
         <div class="state-icon">
@@ -511,21 +503,6 @@ onMounted(() => {
   color: #111827;
   border-color: #6b7280;
   background: #f8fafc;
-}
-
-/* Results bar */
-.results-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-  font-size: 0.8rem;
-  color: #6b7280;
-}
-
-.results-count strong {
-  color: #111827;
-  font-weight: 600;
 }
 
 /* States */
