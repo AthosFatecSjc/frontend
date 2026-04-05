@@ -12,10 +12,13 @@ export interface StoredUser {
 
 export interface LogEntry {
   id: string
-  userId: string
-  userName: string
-  action: string
   timestamp: string
+  categoria: string
+  evento: string
+  resultado: string
+  origem: string
+  actorRef: string
+  modulo: string
   details?: string
 }
 
