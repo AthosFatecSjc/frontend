@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import AuthenticatedLayout from '../components/layout/AuthenticatedLayout.vue'
 import type { StoredUser } from '../types/auth'
 
-type BackendLogResponse = {
+type LogResponse = {
   id: number
   timestamp: string
   actorRef?: string
@@ -13,12 +13,17 @@ type BackendLogResponse = {
   description?: string
   metadata?: string
   createdByModule?: string
-  module?: string
 }
 
-type BackendLogsPayload =
-  | BackendLogResponse[]
-  | { data?: BackendLogResponse[]; content?: BackendLogResponse[]; logs?: BackendLogResponse[] }
+type PageResponse = {
+  content: LogResponse[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  first: boolean
+  last: boolean
+}
 
 type LogRow = {
   id: string
@@ -32,10 +37,11 @@ type LogRow = {
 }
 
 const API_URL = '/api/admin/logs'
-const PAGE_SIZE = 50
+const PAGE_SIZE = 10
 
-const allLogs = ref<LogRow[]>([])
+const logs = ref<LogRow[]>([])
 const total = ref(0)
+const totalPages = ref(1)
 const isLoading = ref(false)
 const error = ref('')
 const isAdmin = ref(false)
@@ -46,14 +52,6 @@ const filters = ref({
   endDate: '',
   evento: '',
   resultado: '',
-})
-
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
-
-const logs = computed(() => {
-  const start = (currentPage.value - 1) * PAGE_SIZE
-  const end = start + PAGE_SIZE
-  return allLogs.value.slice(start, end)
 })
 
 const visiblePages = computed(() => {
@@ -68,53 +66,63 @@ const visiblePages = computed(() => {
   return pages
 })
 
+const paginationStart = computed(() => {
+  if (total.value === 0) return 0
+  return (currentPage.value - 1) * PAGE_SIZE + 1
+})
+
+const paginationEnd = computed(() => {
+  return Math.min(currentPage.value * PAGE_SIZE, total.value)
+})
+
+function buildQueryParams(): URLSearchParams {
+  const params = new URLSearchParams()
+  params.append('page', String(currentPage.value - 1))
+  params.append('size', String(PAGE_SIZE))
+
+  if (filters.value.startDate) params.append('startDate', filters.value.startDate)
+  if (filters.value.endDate) params.append('endDate', filters.value.endDate)
+  if (filters.value.evento) params.append('event', filters.value.evento)
+  if (filters.value.resultado) params.append('result', filters.value.resultado)
+
+  return params
+}
+
 async function fetchLogs() {
   isLoading.value = true
   error.value = ''
 
   try {
-    const res = await fetch(API_URL)
+    const params = buildQueryParams()
+    const url = `${API_URL}?${params.toString()}`
+
+    const res = await fetch(url)
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
 
-    const payload: BackendLogsPayload = await res.json()
-    const logsList = extractLogs(payload)
+    const pageResponse: PageResponse = await res.json()
 
-    const mapped = logsList.map<LogRow>((item) => ({
+    const mapped = pageResponse.content.map<LogRow>((item) => ({
       id: String(item.id),
       timestamp: item.timestamp,
       origem: item.sourceType,
-      usuario: item.actorRef?.trim() || '',
+      usuario: item.actorRef?.trim() || '-',
       evento: item.event,
       descricao: item.description ?? '',
       resultado: item.result === 'SUCCESS' ? 'SUCCESS' : 'FAIL',
-      moduloResponsavel: getModuleValue(item),
+      moduloResponsavel: item.createdByModule?.trim() || '-',
     }))
 
-    allLogs.value = mapped
-    total.value = mapped.length
+    logs.value = mapped
+    total.value = pageResponse.totalElements
+    totalPages.value = pageResponse.totalPages
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Erro inesperado ao carregar logs.'
-    allLogs.value  = []
+    logs.value = []
     total.value = 0
+    totalPages.value = 1
   } finally {
     isLoading.value = false
   }
-}
-
-function extractLogs(payload: BackendLogsPayload) {
-  if (Array.isArray(payload)) return payload
-  if (Array.isArray(payload.data)) return payload.data
-  if (Array.isArray(payload.content)) return payload.content
-  if (Array.isArray(payload.logs)) return payload.logs
-
-  throw new Error('Formato de resposta invalido para logs.')
-}
-
-function getModuleValue(item: BackendLogResponse) {
-  const direct = item.createdByModule?.trim() || item.module?.trim()
-  if (direct) return direct
-
-  return getModuleFromMetadata(item.metadata)
 }
 
 function applyFilters() {
@@ -129,11 +137,17 @@ function clearFilters() {
 }
 
 function prevPage() {
-  if (currentPage.value > 1) { currentPage.value--; fetchLogs() }
+  if (currentPage.value > 1) {
+    currentPage.value--
+    fetchLogs()
+  }
 }
 
 function nextPage() {
-  if (currentPage.value < totalPages.value) { currentPage.value++; fetchLogs() }
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++
+    fetchLogs()
+  }
 }
 
 function goToPage(p: number) {
@@ -143,28 +157,17 @@ function goToPage(p: number) {
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
   })
 }
 
 function formatResult(result: string) {
   return result === 'SUCCESS' ? 'SUCCESS' : 'FAIL'
-}
-
-function getModuleFromMetadata(metadata?: string) {
-  if (!metadata?.trim()) return ''
-
-  try {
-    const parsed = JSON.parse(metadata) as Record<string, unknown>
-    const moduleValue = parsed.module ?? parsed.createdByModule
-    if (typeof moduleValue === 'string' && moduleValue.trim()) return moduleValue.trim()
-  } catch {
-    const moduleMatch = metadata.match(/(?:module|createdByModule)\s*[=:]\s*([\w.-]+)/i)
-    if (moduleMatch?.[1]) return moduleMatch[1]
-  }
-
-  return ''
 }
 
 function checkAdmin() {
@@ -196,48 +199,48 @@ onMounted(() => {
     </div>
 
     <template v-else>
-      <!-- Filters -->
-      <div class="filters-panel">
-      <div class="filters-grid">
-        <div class="field-group">
-          <label class="field-label">Data inicial</label>
-          <input type="date" v-model="filters.startDate" class="field-input" />
-        </div>
-        <div class="field-group">
-          <label class="field-label">Data final</label>
-          <input type="date" v-model="filters.endDate" class="field-input" />
-        </div>
-        <div class="field-group">
-          <label class="field-label">Evento</label>
-          <select v-model="filters.evento" class="field-input">
-            <option value="">Todos os eventos</option>
-            <option value="Login realizado">Login realizado</option>
-            <option value="Tentativa de login">Tentativa de login</option>
-          </select>
-        </div>
-        <div class="field-group">
-          <label class="field-label">Resultado</label>
-          <select v-model="filters.resultado" class="field-input">
-            <option value="">Todos os resultados</option>
-            <option value="Sucesso">Sucesso</option>
-            <option value="Falha">Falha</option>
-          </select>
-        </div>
-        <div class="field-group field-group--action">
-          <button class="btn-apply" @click="applyFilters">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            Filtrar
-          </button>
-          <button class="btn-clear" @click="clearFilters">Limpar</button>
+      <!-- Filters (ocultos temporariamente) -->
+      <div class="filters-panel hidden">
+        <div class="filters-grid">
+          <div class="field-group">
+            <label class="field-label">Data inicial</label>
+            <input type="date" v-model="filters.startDate" class="field-input" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">Data final</label>
+            <input type="date" v-model="filters.endDate" class="field-input" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">Evento</label>
+            <select v-model="filters.evento" class="field-input">
+              <option value="">Todos os eventos</option>
+              <option value="Login realizado">Login realizado</option>
+              <option value="Tentativa de login">Tentativa de login</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Resultado</label>
+            <select v-model="filters.resultado" class="field-input">
+              <option value="">Todos os resultados</option>
+              <option value="Sucesso">Sucesso</option>
+              <option value="Falha">Falha</option>
+            </select>
+          </div>
+          <div class="field-group field-group--action">
+            <button class="btn-apply" @click="applyFilters">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              Filtrar
+            </button>
+            <button class="btn-clear" @click="clearFilters">Limpar</button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Loading -->
-    <div v-if="isLoading" class="state-container">
-      <div class="spinner"></div>
-      <p class="state-text">Carregando registros...</p>
-    </div>
+      <!-- Loading -->
+      <div v-if="isLoading" class="state-container">
+        <div class="spinner"></div>
+        <p class="state-text">Carregando registros...</p>
+      </div>
 
       <!-- Error -->
       <div v-if="error" class="state-container state-error">
@@ -248,19 +251,17 @@ onMounted(() => {
         <p class="state-text">{{ error }}</p>
         <button class="btn-clear-inline" @click="fetchLogs">Tentar novamente</button>
       </div>
+
       <!-- Results bar -->
-      <div class="results-bar">
+      <div v-if="!isLoading && !error" class="results-bar">
         <span class="results-count">
           <strong>{{ total }}</strong>
-          {{ total === 1 ? 'registro encontrado' : 'registros encontrados' }}
-        </span>
-        <span v-if="totalPages > 1" class="results-page">
-          Pagina {{ currentPage }} de {{ totalPages }}
+          {{ total === 1 ? 'registro crítico monitorado' : 'registros críticos monitorados' }}
         </span>
       </div>
 
       <!-- Empty -->
-      <div v-if="total === 0" class="state-container state-empty">
+      <div v-if="!isLoading && total === 0 && !error" class="state-container state-empty">
         <div class="state-icon">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         </div>
@@ -269,18 +270,18 @@ onMounted(() => {
         <button class="btn-clear-inline" @click="clearFilters">Limpar filtros</button>
       </div>
 
-      <!-- Table — dados ja paginados pelo backend, sem slice local -->
-      <div v-else class="table-wrapper">
+      <!-- Table -->
+      <div v-if="!isLoading && logs.length > 0" class="table-wrapper">
         <table class="logs-table">
           <thead>
             <tr>
               <th>Data / Hora</th>
               <th>Origem</th>
-              <th>Usuario</th>
+              <th>Usuário</th>
               <th>Evento</th>
-              <th>Descricao</th>
+              <th>Descrição</th>
               <th>Status</th>
-              <th>Modulo responsavel</th>
+              <th>Módulo responsável</th>
             </tr>
           </thead>
           <tbody>
@@ -301,25 +302,30 @@ onMounted(() => {
         </table>
       </div>
 
-      <!-- Paginacao — totalPages vem de total/PAGE_SIZE -->
-      <div v-if="totalPages > 1" class="pagination">
-        <button class="pag-btn" @click="prevPage" :disabled="currentPage === 1">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
-          Anterior
-        </button>
-        <div class="pag-pages">
-          <button
-            v-for="p in visiblePages"
-            :key="p"
-            class="pag-num"
-            :class="{ active: p === currentPage, ellipsis: p === '...' }"
-            @click="typeof p === 'number' ? goToPage(p) : null"
-          >{{ p }}</button>
+      <!-- Pagination -->
+      <div v-if="!isLoading && totalPages > 1" class="pagination-section">
+        <div class="pagination-info">
+          Mostrando {{ paginationStart }} a {{ paginationEnd }} de {{ total }} registros
         </div>
-        <button class="pag-btn" @click="nextPage" :disabled="currentPage === totalPages">
-          Proxima
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
+        <div class="pagination">
+          <button class="pag-btn" @click="prevPage" :disabled="currentPage === 1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+            Anterior
+          </button>
+          <div class="pag-pages">
+            <button
+              v-for="p in visiblePages"
+              :key="p"
+              class="pag-num"
+              :class="{ active: p === currentPage, ellipsis: p === '...' }"
+              @click="typeof p === 'number' ? goToPage(p) : null"
+            >{{ p }}</button>
+          </div>
+          <button class="pag-btn" @click="nextPage" :disabled="currentPage === totalPages">
+            Próxima
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
       </div>
     </template>
   </AuthenticatedLayout>
@@ -333,6 +339,10 @@ onMounted(() => {
   border-radius: 8px;
   padding: 18px 20px;
   margin-bottom: 20px;
+}
+
+.filters-panel.hidden {
+  display: none;
 }
 
 .filters-grid {
@@ -446,12 +456,6 @@ onMounted(() => {
   font-weight: 600;
 }
 
-.integration-note {
-  margin: 0 0 14px;
-  font-size: 0.8rem;
-  color: #64748b;
-}
-
 /* States */
 .state-container {
   display: flex;
@@ -548,6 +552,7 @@ onMounted(() => {
   border-radius: 8px;
   overflow: hidden;
   overflow-x: auto;
+  margin-bottom: 20px;
 }
 
 .logs-table {
@@ -615,10 +620,6 @@ onMounted(() => {
   font-size: 0.78rem;
 }
 
-.td-muted {
-  color: #6b7280;
-}
-
 /* Tags */
 .tag {
   display: inline-block;
@@ -649,12 +650,24 @@ onMounted(() => {
 }
 
 /* Pagination */
+.pagination-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.pagination-info {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
 .pagination {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-top: 20px;
 }
 
 .pag-btn {
