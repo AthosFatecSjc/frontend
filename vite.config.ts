@@ -27,6 +27,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       },
+      '/api/documentos': {
+        target: 'http://localhost:8181',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      },
       '/java': {
         target: 'http://localhost:8181',
         changeOrigin: true,
