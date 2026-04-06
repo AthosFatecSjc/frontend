@@ -27,6 +27,10 @@ export interface UsuarioCadastroResponse {
 }
 
 export interface BackendErrorResponse {
+  status?: number
+  code?: string
+  message?: string
+  reason?: string | null
   erro?: string
   mensagem?: string
 }

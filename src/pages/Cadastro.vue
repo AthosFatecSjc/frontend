@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { AxiosError } from 'axios'
 
 import logoImage from '../assets/logo.png'
 import AppHeading from '../components/utils/AppHeading.vue'
-import { buscarConsentimentosVigentes, cadastrarUsuario } from '../services/cadastroService'
+import { cadastrarUsuario } from '../services/cadastroService'
 import type {
   BackendErrorResponse,
-  ConsentimentosVigentesResponse,
   UsuarioCadastroRequest,
 } from '../types/cadastro'
 
@@ -30,13 +28,9 @@ const showTermsDialog = ref(false)
 const showPrivacyDialog = ref(false)
 
 const isLoading = ref(false)
-const isLoadingConsentimentos = ref(true)
 
 const feedbackMessage = ref('')
 const feedbackTone = ref<FeedbackTone>('info')
-const consentimentosError = ref('')
-
-const consentimentos = ref<ConsentimentosVigentesResponse | null>(null)
 
 const errors = ref({
   nome: '',
@@ -50,7 +44,7 @@ const submitText = computed(() =>
 )
 
 const isSubmitDisabled = computed(() =>
-  isLoading.value || isLoadingConsentimentos.value,
+  isLoading.value,
 )
 
 function setDangerFeedback(message: string) {
@@ -116,42 +110,11 @@ function validateForm() {
     isValid = false
   }
 
-  if (!consentimentos.value?.terms?.documentId || !consentimentos.value?.privacy?.documentId) {
-    setDangerFeedback('Não foi possível carregar os documentos de consentimento. Tente novamente em instantes.')
-    isValid = false
-  }
-
   return isValid
 }
 
 function montarTermsIds() {
-  if (!consentimentos.value) {
-    return []
-  }
-
-  const ids = [
-    consentimentos.value.terms.documentId,
-    consentimentos.value.privacy.documentId,
-  ]
-
-  if (aceitaMarketing.value && consentimentos.value.marketing?.documentId) {
-    ids.push(consentimentos.value.marketing.documentId)
-  }
-
-  return ids
-}
-
-async function carregarConsentimentos() {
-  isLoadingConsentimentos.value = true
-  consentimentosError.value = ''
-
-  try {
-    consentimentos.value = await buscarConsentimentosVigentes()
-  } catch {
-    consentimentosError.value = 'Não foi possível carregar o Termo de Uso e o Aviso de Privacidade.'
-  } finally {
-    isLoadingConsentimentos.value = false
-  }
+  return []
 }
 
 async function onSubmit() {
@@ -173,17 +136,17 @@ async function onSubmit() {
   }
 
   try {
-    await cadastrarUsuario(payload)
+    const response = await cadastrarUsuario(payload)
     feedbackTone.value = 'info'
-    feedbackMessage.value = 'Cadastro realizado com sucesso. Sua solicitação está em análise.'
+    feedbackMessage.value = response.mensagem
   } catch (error) {
-    const axiosError = error as AxiosError<BackendErrorResponse>
-    const status = axiosError.response?.status
-    const backendCode = axiosError.response?.data?.erro
-    const backendMessage = axiosError.response?.data?.mensagem
+    const backendError = error as Error & BackendErrorResponse
+    const status = backendError.status
+    const backendCode = backendError.code ?? backendError.erro
+    const backendMessage = backendError.message ?? backendError.mensagem
 
     if (status === 409) {
-      setDangerFeedback('Este e-mail já está cadastrado.')
+      setDangerFeedback('E-mail já cadastrado.')
     } else if (backendCode === 'TERMO_NAO_ENCONTRADO') {
       setDangerFeedback('Você precisa aceitar o Termo de Uso para continuar.')
     } else if (backendMessage) {
@@ -199,10 +162,6 @@ async function onSubmit() {
 function goToLogin() {
   router.push('/login')
 }
-
-onMounted(() => {
-  carregarConsentimentos()
-})
 </script>
 
 <template>
@@ -232,10 +191,6 @@ onMounted(() => {
         </header>
 
         <form class="login-form" @submit.prevent="onSubmit">
-          <UiAlert v-if="consentimentosError" tone="danger">
-            {{ consentimentosError }}
-          </UiAlert>
-
           <UiAlert v-if="feedbackMessage" :tone="feedbackTone">
             {{ feedbackMessage }}
           </UiAlert>
@@ -294,7 +249,7 @@ onMounted(() => {
 
           <div class="terms-block">
             <label class="term-item">
-              <input type="checkbox" v-model="aceitaTermo">
+              <input v-model="aceitaTermo" type="checkbox">
               <span>
                 Li e aceito o Termo de Uso
                 <button type="button" class="term-link" @click="showTermsDialog = true">
@@ -304,7 +259,7 @@ onMounted(() => {
             </label>
 
             <label class="term-item">
-              <input type="checkbox" v-model="aceitaPrivacidade">
+              <input v-model="aceitaPrivacidade" type="checkbox">
               <span>
                 Li o Aviso de Privacidade
                 <button type="button" class="term-link" @click="showPrivacyDialog = true">
@@ -314,7 +269,7 @@ onMounted(() => {
             </label>
 
             <label class="term-item">
-              <input type="checkbox" v-model="aceitaMarketing">
+              <input v-model="aceitaMarketing" type="checkbox">
               <span>
                 Aceito receber comunicações e novidades por e-mail
               </span>
@@ -342,8 +297,8 @@ onMounted(() => {
     <div v-if="showTermsDialog" class="modal-overlay" @click.self="showTermsDialog = false">
       <div class="modal-card">
         <h3>Termo de Uso</h3>
-        <p class="doc-version">Versão {{ consentimentos?.terms?.version ?? '-' }}</p>
-        <div class="doc-content">{{ consentimentos?.terms?.content || 'Conteúdo indisponível.' }}</div>
+        <p class="doc-version">Versão local</p>
+        <div class="doc-content">Ao solicitar acesso, você confirma que utilizará a plataforma conforme as regras internas da organização e que as informações fornecidas no cadastro são verdadeiras.</div>
         <button type="button" class="modal-close" @click="showTermsDialog = false">Fechar</button>
       </div>
     </div>
@@ -351,8 +306,8 @@ onMounted(() => {
     <div v-if="showPrivacyDialog" class="modal-overlay" @click.self="showPrivacyDialog = false">
       <div class="modal-card">
         <h3>Aviso de Privacidade</h3>
-        <p class="doc-version">Versão {{ consentimentos?.privacy?.version ?? '-' }}</p>
-        <div class="doc-content">{{ consentimentos?.privacy?.content || 'Conteúdo indisponível.' }}</div>
+        <p class="doc-version">Versão local</p>
+        <div class="doc-content">Os dados informados no cadastro serão usados para análise de acesso, autenticação e administração da sua conta, conforme necessidade operacional da plataforma.</div>
         <button type="button" class="modal-close" @click="showPrivacyDialog = false">Fechar</button>
       </div>
     </div>

@@ -27,16 +27,23 @@ async function onSubmit() {
   status.value = null
   isLoading.value = true
 
-  const result = await loginWithStorage(email.value, senha.value)
+  try {
+    const result = await loginWithStorage(email.value, senha.value)
 
-  if (result.type === 'success' && result.nextRoute) {
-    await router.push(result.nextRoute)
+    if (result.type === 'success' && result.nextRoute) {
+      await router.push(result.nextRoute)
+      return
+    }
+
+    status.value = { type: result.type, message: result.message }
+  } catch {
+    status.value = {
+      type: 'invalid',
+      message: 'Não foi possível realizar login. Tente novamente.',
+    }
+  } finally {
     isLoading.value = false
-    return
   }
-
-  status.value = { type: result.type, message: result.message }
-  isLoading.value = false
 }
 
 function goToRegister() {

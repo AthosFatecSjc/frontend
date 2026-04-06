@@ -1,6 +1,7 @@
 import type { AdminLogsFilters, AdminLogsPageResponse } from '@/types/adminLogs'
+import { API_BASE_URL, createProtectedJsonRequest, parseApiResponse } from './api'
 
-const API_URL = '/api/admin/logs'
+const API_URL = `${API_BASE_URL}/admin/logs`
 
 function createEmptyPageResponse(page: number, size: number): AdminLogsPageResponse {
   return {
@@ -35,36 +36,12 @@ function buildQueryParams(page: number, size: number, filters: AdminLogsFilters)
   return params
 }
 
-async function parseResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    let message = 'Falha ao carregar os logs.'
-
-    try {
-      const errorBody = await response.json()
-      message = errorBody.message ?? errorBody.error ?? message
-    } catch {
-      message = response.statusText || message
-    }
-
-    if (response.status === 401) {
-      throw new Error('O backend exige um usuario autenticado para acessar os logs.')
-    }
-
-    if (response.status === 403) {
-      throw new Error('Apenas administradores podem acessar os logs.')
-    }
-
-    throw new Error(message)
-  }
-
-  return response.json() as Promise<T>
-}
-
 export async function fetchAdminLogs(page: number, size: number, filters: AdminLogsFilters) {
   const params = buildQueryParams(page, size, filters)
-  const response = await fetch(`${API_URL}?${params.toString()}`, {
-    credentials: 'include',
-  })
+  const response = await fetch(
+    `${API_URL}?${params.toString()}`,
+    createProtectedJsonRequest(),
+  )
 
   if (response.status === 204 || response.status === 404) {
     return createEmptyPageResponse(page, size)
@@ -96,5 +73,5 @@ export async function fetchAdminLogs(page: number, size: number, filters: AdminL
     }
   }
 
-  return parseResponse<AdminLogsPageResponse>(response)
+  return parseApiResponse<AdminLogsPageResponse>(response, 'Falha ao carregar os logs.')
 }

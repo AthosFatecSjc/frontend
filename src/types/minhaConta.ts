@@ -1,4 +1,4 @@
-export type StatusConta = 'ATIVO' | 'PENDENTE' | 'REJEITADO' | string | null
+export type StatusConta = 'ATIVO' | 'PENDENTE' | 'REJEITADO' | 'APROVADO' | string | null
 
 export interface MinhaContaResponse {
   nomeCompleto: string | null
