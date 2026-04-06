@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import logoUrl from '@/assets/logo.png'
 
+defineEmits<{
+  logout: []
+}>()
+
 defineProps<{
   expanded: boolean
   userName?: string
@@ -27,7 +31,12 @@ defineProps<{
       <AppModulesMenu :collapsed="!expanded" />
     </div>
 
-    <button type="button" class="sidebar__logout" :class="{ 'sidebar__logout--collapsed': !expanded }">
+    <button
+      type="button"
+      class="sidebar__logout"
+      :class="{ 'sidebar__logout--collapsed': !expanded }"
+      @click="$emit('logout')"
+    >
       <span class="sidebar__logout-icon">&#8627;</span>
       <span v-if="expanded">Sair</span>
     </button>

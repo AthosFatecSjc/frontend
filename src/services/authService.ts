@@ -93,7 +93,7 @@ export async function loginWithStorage(email: string, senha: string): Promise<Lo
       type: 'success',
       message: 'Login realizado com sucesso.',
       auth,
-      nextRoute: '/dashboard',
+      nextRoute: '/minha-conta',
     }
   } catch (error) {
     const status = typeof error === 'object' && error !== null && 'status' in error
