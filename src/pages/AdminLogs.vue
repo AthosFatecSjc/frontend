@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 
 import AuthenticatedLayout from '../components/layout/AuthenticatedLayout.vue'
 import { fetchAdminLogs } from '../services/adminLogs'
-import type { StoredUser } from '../types/auth'
 import type { AdminLogsFilters } from '../types/adminLogs'
 
 type LogRow = {
@@ -49,7 +48,7 @@ const total = ref(0)
 const totalPages = ref(1)
 const isLoading = ref(false)
 const error = ref('')
-const isAdmin = ref(false)
+const isAdmin = ref(true)
 const currentPage = ref(1)
 
 const filters = ref<Required<AdminLogsFilters>>({
@@ -94,6 +93,7 @@ async function loadLogs() {
 
   try {
     const pageResponse = await fetchAdminLogs(currentPage.value - 1, PAGE_SIZE, filters.value)
+    isAdmin.value = true
 
     logs.value = pageResponse.content.map<LogRow>((item) => ({
       id: String(item.id),
@@ -109,7 +109,18 @@ async function loadLogs() {
     total.value = pageResponse.totalElements
     totalPages.value = pageResponse.totalPages || 1
   } catch (exception) {
-    error.value = exception instanceof Error ? exception.message : 'Erro inesperado ao carregar logs.'
+    const message = exception instanceof Error ? exception.message : 'Erro inesperado ao carregar logs.'
+    const status = typeof exception === 'object' && exception !== null && 'status' in exception
+      ? Number(exception.status)
+      : 0
+
+    if (status === 403) {
+      isAdmin.value = false
+      error.value = ''
+    } else {
+      error.value = message
+    }
+
     logs.value = []
     total.value = 0
     totalPages.value = 1
@@ -181,20 +192,8 @@ function formatEvent(event: string) {
   return eventLabelMap[event] ?? event
 }
 
-function checkAdmin() {
-  const userStr = localStorage.getItem('currentUser')
-  if (!userStr) return
-
-  const user: StoredUser = JSON.parse(userStr)
-  isAdmin.value = user.role === 'ADMIN'
-}
-
 onMounted(() => {
-  checkAdmin()
-
-  if (isAdmin.value) {
-    void loadLogs()
-  }
+  void loadLogs()
 })
 </script>
 

@@ -1,32 +1,32 @@
-export type UserStatus = 'PENDENTE' | 'ATIVO' | 'REJEITADO'
-export type UserRole = 'USER' | 'ADMIN'
-
-export interface StoredUser {
-  id: string
-  nome: string
-  email: string
-  senhaHash: string
-  status: UserStatus
-  role: UserRole
-}
-
-export interface LogEntry {
-  id: string
-  timestamp: string
-  categoria: string
-  evento: string
-  resultado: string
-  origem: string
-  actorRef: string
-  modulo: string
-  details?: string
-}
+export type UserStatus = 'ATIVO' | 'PENDENTE' | 'REJEITADO' | 'APROVADO'
 
 export type LoginResultType = 'success' | 'pending' | 'rejected' | 'invalid'
+
+export interface LoginRequest {
+  email: string
+  senha: string
+}
+
+export interface LoginResponse {
+  accessToken: string
+  tokenType: string
+  userId: string
+  email: string
+  nome: string
+}
+
+export interface BackendAuthError {
+  timestamp: string
+  status: number
+  code: string
+  message: string
+  severity: string
+  reason: string | null
+}
 
 export interface LoginResult {
   type: LoginResultType
   message: string
-  user?: StoredUser
+  auth?: LoginResponse
   nextRoute?: string
 }

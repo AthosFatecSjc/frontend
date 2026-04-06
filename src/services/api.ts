@@ -1,0 +1,48 @@
+import { clearAuthSession, createAuthHeaders } from './authService'
+
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
+
+type BackendError = {
+  status?: number
+  code?: string
+  message?: string
+  error?: string
+  severity?: string
+  reason?: string | null
+}
+
+export async function parseApiResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
+  if (!response.ok) {
+    let errorBody: BackendError = {}
+
+    try {
+      errorBody = await response.json() as BackendError
+    } catch {
+      errorBody = {}
+    }
+
+    if (response.status === 401) {
+      clearAuthSession()
+    }
+
+    const error = new Error(errorBody.message ?? errorBody.error ?? fallbackMessage)
+    Object.assign(error, {
+      status: response.status,
+      code: errorBody.code,
+      reason: errorBody.reason,
+    })
+    throw error
+  }
+
+  return response.json() as Promise<T>
+}
+
+export function createProtectedJsonRequest(init?: RequestInit): RequestInit {
+  return {
+    ...init,
+    headers: {
+      ...createAuthHeaders(),
+      ...(init?.headers ?? {}),
+    },
+  }
+}

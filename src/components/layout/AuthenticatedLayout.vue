@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+import { clearAuthSession } from '@/services/authService'
 
 defineProps<{
   title: string
@@ -8,7 +11,13 @@ defineProps<{
   roleLabel?: string
 }>()
 
+const router = useRouter()
 const sidebarHovered = ref(false)
+
+async function handleLogout() {
+  clearAuthSession()
+  await router.push('/login')
+}
 </script>
 
 <template>
@@ -20,6 +29,7 @@ const sidebarHovered = ref(false)
         :role-label="roleLabel"
         @mouseenter="sidebarHovered = true"
         @mouseleave="sidebarHovered = false"
+        @logout="handleLogout"
       />
 
       <div class="content" :class="{ 'content--expanded': sidebarHovered }">

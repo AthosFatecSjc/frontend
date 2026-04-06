@@ -1,45 +1,23 @@
 import type { MinhaContaResponse, MinhaContaUpdateRequest } from '@/types/minhaConta'
-
-const JSON_HEADERS = {
-  'Content-Type': 'application/json',
-}
-
-async function parseResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    let message = 'Falha ao processar a requisição.'
-
-    try {
-      const errorBody = await response.json()
-      message = errorBody.message ?? errorBody.error ?? message
-    } catch {
-      message = response.statusText || message
-    }
-
-    if (response.status === 401) {
-      throw new Error('O backend exige um usuário autenticado para carregar esta tela.')
-    }
-
-    throw new Error(message)
-  }
-
-  return response.json() as Promise<T>
-}
+import { API_BASE_URL, createProtectedJsonRequest, parseApiResponse } from './api'
 
 export async function fetchMinhaConta() {
-  const response = await fetch('/api/usuarios/minha-conta', {
-    credentials: 'include',
-  })
+  const response = await fetch(
+    `${API_BASE_URL}/usuarios/minha-conta`,
+    createProtectedJsonRequest(),
+  )
 
-  return parseResponse<MinhaContaResponse>(response)
+  return parseApiResponse<MinhaContaResponse>(response, 'Não foi possível carregar os dados da conta.')
 }
 
 export async function updateMinhaConta(payload: MinhaContaUpdateRequest) {
-  const response = await fetch('/api/usuarios/minha-conta', {
-    method: 'PUT',
-    headers: JSON_HEADERS,
-    credentials: 'include',
-    body: JSON.stringify(payload),
-  })
+  const response = await fetch(
+    `${API_BASE_URL}/usuarios/minha-conta`,
+    createProtectedJsonRequest({
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  )
 
-  return parseResponse<MinhaContaResponse>(response)
+  return parseApiResponse<MinhaContaResponse>(response, 'Não foi possível atualizar os dados da conta.')
 }
