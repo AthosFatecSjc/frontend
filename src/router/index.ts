@@ -1,42 +1,44 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-
-const routes = [
-  {
-    path: '/',
-    name: 'Dashboard',
-    component: () => import('@/pages/Dashboard.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/login',
-    name: 'Login',
-    component: () => import('@/pages/Login.vue'),
-    meta: { public: true },
-  },
-  {
-    path: '/minha-conta',
-    name: 'MinhaConta',
-    component: () => import('@/pages/MinhaConta.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/cadastro',
-    name: 'Cadastro',
-    component: () => import('@/pages/Cadastro.vue'),
-    meta: { public: true },
-  },
-  {
-    path: '/gestao-usuarios',
-    name: 'GestaoUsuarios',
-    component: () => import('@/pages/GestaoUsuarios.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true },
-  },
-];
-
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes,
+  routes: [
+    {
+      path: '/',
+      redirect: '/login',
+    },
+    {
+      path: '/login',
+      name: 'Login',
+      component: () => import('../pages/Login.vue'),
+    },
+    {
+      path: '/cadastro',
+      name: 'Cadastro',
+      component: () => import('../pages/Cadastro.vue'),
+    },
+    {
+      path: '/dashboard',
+      name: 'Dashboard',
+      component: () => import('../pages/Dashboard.vue'),
+    },
+    {
+      path: '/minha-conta',
+      name: 'MinhaConta',
+      component: () => import('../pages/MinhaConta.vue'),
+    },
+    {
+      path: '/admin/logs',
+      name: 'AdminLogs',
+      component: () => import('../pages/AdminLogs.vue'),
+    },
+    {
+      path: '/gestao-usuarios',
+      name: 'GestaoUsuarios',
+      component: () => import('@/pages/GestaoUsuarios.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+  ],
 })
 
 export default router
