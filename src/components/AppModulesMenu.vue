@@ -12,6 +12,7 @@ const route = useRoute()
 
 const items = [
   { label: 'Minha Conta', to: '/minha-conta', icon: 'user', match: ['/minha-conta'] },
+  { label: 'Gestão de Usuários', to: '/gestao-usuarios', icon: 'mdi-account-group', match: ['/gestao-usuarios'] },
 ]
 
 const visibleItems = computed(() => items.map(item => ({
