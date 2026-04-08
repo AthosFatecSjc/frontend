@@ -10,9 +10,11 @@ type LogRow = {
   timestamp: string
   origem: string
   usuario: string
+  alvo: string
   evento: string
   descricao: string
   resultado: string
+  categoria: string
   moduloResponsavel: string
 }
 
@@ -100,9 +102,11 @@ async function loadLogs() {
       timestamp: item.timestamp,
       origem: item.sourceType,
       usuario: item.actorRef?.trim() || '-',
+      alvo: item.targetRef?.trim() || '-',
       evento: item.event,
       descricao: item.description ?? '',
       resultado: item.result === 'SUCCESS' ? 'SUCCESS' : 'FAIL',
+      categoria: item.logCategory?.trim() || '-',
       moduloResponsavel: item.createdByModule?.trim() || '-',
     }))
 
@@ -282,8 +286,10 @@ onMounted(() => {
             <tr>
               <th>Data / Hora</th>
               <th>Origem</th>
-              <th>Usuario</th>
+              <th>Ator</th>
+              <th>Alvo</th>
               <th>Evento</th>
+              <th>Categoria</th>
               <th>Descricao</th>
               <th>Status</th>
               <th>Modulo responsavel</th>
@@ -294,7 +300,9 @@ onMounted(() => {
               <td class="td-mono">{{ formatDate(log.timestamp) }}</td>
               <td><UiBadge class="tag-source">{{ log.origem }}</UiBadge></td>
               <td class="td-placeholder">{{ log.usuario }}</td>
+              <td class="td-placeholder">{{ log.alvo }}</td>
               <td>{{ formatEvent(log.evento) }}</td>
+              <td><UiBadge class="tag-category">{{ log.categoria }}</UiBadge></td>
               <td class="td-description">{{ log.descricao }}</td>
               <td>
                 <UiBadge :tone="log.resultado === 'SUCCESS' ? 'success' : 'danger'">
@@ -517,7 +525,7 @@ onMounted(() => {
 .logs-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 860px;
+  min-width: 1200px;
   font-size: 0.84rem;
 }
 
@@ -583,6 +591,14 @@ onMounted(() => {
   min-height: 1.8rem;
   padding: 0.2rem 0.7rem;
   letter-spacing: 0.04em;
+}
+
+.tag-category {
+  min-height: 1.8rem;
+  padding: 0.2rem 0.7rem;
+  letter-spacing: 0.04em;
+  background-color: #e9d5ff;
+  color: #5b21b6;
 }
 
 .pagination-section {

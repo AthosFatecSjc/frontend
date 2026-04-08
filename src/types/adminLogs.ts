@@ -2,11 +2,13 @@ export interface AdminLogResponse {
   id: number
   timestamp: string
   actorRef?: string
+  targetRef?: string
   sourceType: string
   event: string
   result: string
   description?: string
   metadata?: string
+  logCategory?: string
   createdByModule?: string
 }
 
