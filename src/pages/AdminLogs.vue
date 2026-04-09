@@ -23,7 +23,7 @@ const EVENT_OPTIONS = [
   { value: 'LOGIN_SUCCESS', label: 'Login com sucesso' },
   { value: 'LOGIN_FAIL', label: 'Falha no login' },
   { value: 'USER_REGISTER', label: 'Cadastro de usuario' },
-  { value: 'USER_APPROVED', label: 'Usuario aprovado' },
+  { value: 'USER_APPROVED', label: 'Usuario ativado' },
   { value: 'USER_REJECTED', label: 'Usuario rejeitado' },
   { value: 'USER_EDITED', label: 'Usuario editado' },
   { value: 'USER_ANONYMIZED', label: 'Usuario anonimizado' },

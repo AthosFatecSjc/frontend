@@ -72,7 +72,7 @@ function goToRegister() {
           <AppHeading
             eyebrow="Autenticacao"
             title="Entrar na plataforma"
-            subtitle="O acesso esta disponivel apenas para usuarios aprovados."
+            subtitle="O acesso esta disponivel apenas para usuarios com conta ATIVA."
             size="lg"
           />
         </header>
