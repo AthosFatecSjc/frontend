@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { fetchMinhaConta, updateMinhaConta } from '@/services/minhaConta'
-import type { MinhaContaResponse, StatusConta } from '@/types/minhaConta'
+import type { MinhaContaResponse, OfficialStatusConta, StatusContaApi } from '@/types/minhaConta'
 
 const loading = ref(true)
 const saving = ref(false)
@@ -14,8 +14,23 @@ const form = ref({
   telefone: '',
 })
 
+function normalizeStatus(status: StatusContaApi): OfficialStatusConta | null {
+  if (status === 'ATIVO' || status === 'PENDENTE' || status === 'REJEITADO') {
+    return status
+  }
+
+  return null
+}
+
+const normalizedStatus = computed<OfficialStatusConta | null>(() => normalizeStatus(account.value?.status ?? null))
+
+const hasUnexpectedStatus = computed(() => {
+  const rawStatus = account.value?.status ?? null
+  return rawStatus !== null && normalizeStatus(rawStatus) === null
+})
+
 const statusTone = computed(() => {
-  switch (account.value?.status) {
+  switch (normalizedStatus.value) {
     case 'ATIVO':
       return 'success'
     case 'PENDENTE':
@@ -110,8 +125,15 @@ function formatDate(value: string | null) {
   }).format(new Date(value))
 }
 
-function statusLabel(status: StatusConta) {
-  return status ?? 'SEM STATUS'
+function statusLabel(status: StatusContaApi) {
+  const normalized = normalizeStatus(status)
+  if (normalized) return normalized
+
+  if (status === null || status.trim?.() === '') {
+    return 'SEM STATUS'
+  }
+
+  return 'STATUS INVALIDO'
 }
 
 async function loadMinhaConta() {
@@ -170,6 +192,9 @@ onMounted(loadMinhaConta)
 
         <UiAlert v-if="errorMessage" tone="danger">{{ errorMessage }}</UiAlert>
         <UiAlert v-else-if="successMessage">{{ successMessage }}</UiAlert>
+        <UiAlert v-if="hasUnexpectedStatus" tone="warning">
+          O backend retornou um status de conta nao reconhecido. Contate o suporte.
+        </UiAlert>
 
         <div v-if="loading" class="loading-state">Carregando dados da conta...</div>
 

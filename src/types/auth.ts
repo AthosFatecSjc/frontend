@@ -1,4 +1,4 @@
-export type UserStatus = 'ATIVO' | 'PENDENTE' | 'REJEITADO' | 'APROVADO'
+export type UserStatus = 'ATIVO' | 'PENDENTE' | 'REJEITADO'
 
 export type LoginResultType = 'success' | 'pending' | 'rejected' | 'invalid'
 
