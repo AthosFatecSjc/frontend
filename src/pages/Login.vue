@@ -30,7 +30,7 @@ async function onSubmit() {
   try {
     const result = await loginWithStorage(email.value, senha.value)
 
-    if (result.type === 'success' && result.nextRoute) {
+    if (result.nextRoute) {
       await router.push(result.nextRoute)
       return
     }

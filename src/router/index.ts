@@ -18,6 +18,11 @@ const router = createRouter({
       component: () => import('../pages/Cadastro.vue'),
     },
     {
+      path: '/consentimentos-pendentes',
+      name: 'PendingTerms',
+      component: () => import('../pages/PendingTerms.vue'),
+    },
+    {
       path: '/dashboard',
       name: 'Dashboard',
       component: () => import('../pages/Dashboard.vue'),
