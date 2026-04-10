@@ -127,13 +127,15 @@ function formatDate(value: string | null) {
 
 function statusLabel(status: StatusContaApi) {
   const normalized = normalizeStatus(status)
-  if (normalized) return normalized
+  if (normalized === 'ATIVO') return 'Ativa'
+  if (normalized === 'PENDENTE') return 'Pendente'
+  if (normalized === 'REJEITADO') return 'Rejeitada'
 
   if (status === null || status.trim?.() === '') {
-    return 'SEM STATUS'
+    return 'Sem status'
   }
 
-  return 'STATUS INVALIDO'
+  return 'Status não reconhecido'
 }
 
 async function loadMinhaConta() {
@@ -144,7 +146,7 @@ async function loadMinhaConta() {
     const data = await fetchMinhaConta()
     applyAccountData(data)
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Nao foi possivel carregar a conta.'
+    errorMessage.value = error instanceof Error ? error.message : 'Não foi possível carregar a conta.'
   } finally {
     loading.value = false
   }
@@ -164,9 +166,9 @@ async function handleSave() {
     })
 
     applyAccountData(data)
-    successMessage.value = 'Alteracoes salvas com sucesso.'
+    successMessage.value = 'Alterações salvas com sucesso.'
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Nao foi possivel salvar as alteracoes.'
+    errorMessage.value = error instanceof Error ? error.message : 'Não foi possível salvar as alterações.'
   } finally {
     saving.value = false
   }
@@ -193,7 +195,7 @@ onMounted(loadMinhaConta)
         <UiAlert v-if="errorMessage" tone="danger">{{ errorMessage }}</UiAlert>
         <UiAlert v-else-if="successMessage">{{ successMessage }}</UiAlert>
         <UiAlert v-if="hasUnexpectedStatus" tone="warning">
-          O backend retornou um status de conta nao reconhecido. Contate o suporte.
+          O sistema retornou um status de conta não reconhecido. Entre em contato com o suporte.
         </UiAlert>
 
         <div v-if="loading" class="loading-state">Carregando dados da conta...</div>
