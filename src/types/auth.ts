@@ -13,6 +13,10 @@ export interface LoginResponse {
   userId: string
   email: string
   nome: string
+  isAdmin: boolean
+  status: UserStatus
+  roles: string[]
+  mustChangePasswordOnFirstLogin: boolean
 }
 
 export interface BackendAuthError {

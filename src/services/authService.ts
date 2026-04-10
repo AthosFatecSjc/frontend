@@ -1,10 +1,10 @@
-import type { BackendAuthError, LoginResponse, LoginResult } from '../types/auth'
+import type { BackendAuthError, LoginResponse, LoginResult, UserStatus } from '../types/auth'
 import { API_BASE_URL } from './api'
 
 const ACCESS_TOKEN_STORAGE_KEY = 'accessToken'
 const AUTH_USER_STORAGE_KEY = 'authUser'
 
-type StoredAuthUser = Pick<LoginResponse, 'userId' | 'email' | 'nome'>
+type StoredAuthUser = Pick<LoginResponse, 'userId' | 'email' | 'nome' | 'isAdmin' | 'status' | 'roles' | 'mustChangePasswordOnFirstLogin'>
 
 function normalizeErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message.trim()) {
@@ -44,7 +44,30 @@ export function storeAuthSession(payload: LoginResponse) {
     userId: payload.userId,
     email: payload.email,
     nome: payload.nome,
+    isAdmin: payload.isAdmin,
+    status: payload.status,
+    roles: payload.roles,
+    mustChangePasswordOnFirstLogin: payload.mustChangePasswordOnFirstLogin,
   }))
+}
+
+export function isAuthenticated(): boolean {
+  return !!getAccessToken() && !!getAuthUser()
+}
+
+export function isAdmin(): boolean {
+  const user = getAuthUser()
+  return user?.isAdmin === true
+}
+
+export function mustChangePassword(): boolean {
+  const user = getAuthUser()
+  return user?.mustChangePasswordOnFirstLogin === true
+}
+
+export function getUserStatus(): UserStatus | null {
+  const user = getAuthUser()
+  return user?.status ?? null
 }
 
 export function createAuthHeaders() {

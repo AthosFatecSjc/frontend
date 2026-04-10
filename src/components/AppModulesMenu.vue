@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { isAdmin } from '../services/authService'
 
 const props = withDefaults(defineProps<{
   collapsed?: boolean
@@ -12,13 +13,15 @@ const route = useRoute()
 
 const items = [
   { label: 'Minha Conta', to: '/minha-conta', icon: 'user', match: ['/minha-conta'] },
-  { label: 'Logs e Auditoria', to: '/admin/logs', icon: 'logs', match: ['/admin/logs'] },
+  { label: 'Logs e Auditoria', to: '/admin/logs', icon: 'logs', match: ['/admin/logs'], adminOnly: true },
 ]
 
-const visibleItems = computed(() => items.map(item => ({
-  ...item,
-  isActive: item.match.some(path => route.path.startsWith(path)),
-})))
+const visibleItems = computed(() => items
+  .filter(item => !item.adminOnly || isAdmin())
+  .map(item => ({
+    ...item,
+    isActive: item.match.some(path => route.path.startsWith(path)),
+  })))
 </script>
 
 <template>
