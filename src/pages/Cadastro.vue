@@ -225,7 +225,7 @@ onMounted(() => {
             <span>TECSYS</span>
           </div>
         </div>
-        <span class="topbar-badge">PLATAFORMA ANALITICA</span>
+        <span class="topbar-badge">PLATAFORMA ANALÍTICA</span>
       </div>
     </header>
 

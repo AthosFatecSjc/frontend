@@ -137,7 +137,7 @@ export async function loginWithStorage(email: string, senha: string): Promise<Lo
     if (status === 403 && code === 'INVALID_USER_STATUS') {
       return {
         type: 'invalid',
-        message: 'Seu cadastro nao esta com status ATIVO. Entre em contato com o administrador.',
+        message: 'Seu cadastro não está com status ativo. Entre em contato com o administrador.',
       }
     }
 
