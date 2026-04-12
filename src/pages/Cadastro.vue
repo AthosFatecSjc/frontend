@@ -1,18 +1,22 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import logoImage from '../assets/logo.png'
 import AppHeading from '../components/utils/AppHeading.vue'
-import { cadastrarUsuario } from '../services/cadastroService'
+import { cadastrarUsuario, buscarConsentimentosVigentes } from '../services/cadastroService'
 import type {
   BackendErrorResponse,
   UsuarioCadastroRequest,
+  ConsentimentosVigentesResponse,
+  AcceptedTerm
 } from '../types/cadastro'
 
 type FeedbackTone = 'info' | 'danger'
 
 const router = useRouter()
+
+const isSuccess = ref(false)
 
 const nome = ref('')
 const email = ref('')
@@ -26,11 +30,14 @@ const aceitaMarketing = ref(false)
 
 const showTermsDialog = ref(false)
 const showPrivacyDialog = ref(false)
+const showMarketingDialog = ref(false)
 
 const isLoading = ref(false)
 
 const feedbackMessage = ref('')
 const feedbackTone = ref<FeedbackTone>('info')
+
+const currentTerms = ref<ConsentimentosVigentesResponse | null>(null)
 
 const errors = ref({
   nome: '',
@@ -100,12 +107,12 @@ function validateForm() {
     isValid = false
   }
 
-  if (!aceitaTermo.value) {
+  if (currentTerms.value?.terms.required && !aceitaTermo.value) {
     setDangerFeedback('Você precisa aceitar o Termo de Uso para continuar.')
     isValid = false
   }
 
-  if (!aceitaPrivacidade.value) {
+  if (currentTerms.value?.privacy.required && !aceitaPrivacidade.value) {
     setDangerFeedback('Você precisa confirmar ciência do Aviso de Privacidade.')
     isValid = false
   }
@@ -113,8 +120,31 @@ function validateForm() {
   return isValid
 }
 
-function montarTermsIds() {
-  return []
+function mountTerms() {
+  let acceptedTerms: AcceptedTerm[] = []
+  
+  if (aceitaTermo.value && currentTerms.value?.terms) {
+    acceptedTerms.push({
+      id: currentTerms.value.terms.documentId,
+      version: currentTerms.value.terms.version,
+    })
+  }
+
+  if (aceitaPrivacidade.value && currentTerms.value?.privacy) {
+    acceptedTerms.push({
+      id: currentTerms.value.privacy.documentId,
+      version: currentTerms.value.privacy.version,
+    })
+  }
+
+  if (aceitaMarketing.value && currentTerms.value?.marketing) {
+    acceptedTerms.push({
+      id: currentTerms.value.marketing.documentId,
+      version: currentTerms.value.marketing.version,
+    })
+  }
+
+  return acceptedTerms
 }
 
 async function onSubmit() {
@@ -128,7 +158,7 @@ async function onSubmit() {
     nomeCompleto: nome.value.trim(),
     email: email.value.trim(),
     senha: senha.value,
-    termsIds: montarTermsIds(),
+    terms: mountTerms(),
   }
 
   if (telefone.value.trim()) {
@@ -139,6 +169,7 @@ async function onSubmit() {
     const response = await cadastrarUsuario(payload)
     feedbackTone.value = 'info'
     feedbackMessage.value = response.mensagem
+    isSuccess.value = true
   } catch (error) {
     const backendError = error as Error & BackendErrorResponse
     const status = backendError.status
@@ -162,6 +193,25 @@ async function onSubmit() {
 function goToLogin() {
   router.push('/login')
 }
+
+async function pageRender() {
+  isLoading.value = true
+
+  try {
+    currentTerms.value = await buscarConsentimentosVigentes()
+  } catch (error) {
+    feedbackTone.value = 'danger'
+    feedbackMessage.value = error instanceof Error
+      ? error.message
+      : 'Error loading the page. Please try again'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  pageRender()
+})
 </script>
 
 <template>
@@ -190,7 +240,7 @@ function goToLogin() {
           />
         </header>
 
-        <form class="login-form" @submit.prevent="onSubmit">
+        <form v-if="!isSuccess" class="login-form" @submit.prevent="onSubmit">
           <UiAlert v-if="feedbackMessage" :tone="feedbackTone">
             {{ feedbackMessage }}
           </UiAlert>
@@ -248,7 +298,7 @@ function goToLogin() {
           </div>
 
           <div class="terms-block">
-            <label class="term-item">
+            <label v-if="currentTerms?.terms" class="term-item">
               <input v-model="aceitaTermo" type="checkbox">
               <span>
                 Li e aceito o Termo de Uso
@@ -258,7 +308,7 @@ function goToLogin() {
               </span>
             </label>
 
-            <label class="term-item">
+            <label v-if="currentTerms?.privacy" class="term-item">
               <input v-model="aceitaPrivacidade" type="checkbox">
               <span>
                 Li o Aviso de Privacidade
@@ -268,10 +318,13 @@ function goToLogin() {
               </span>
             </label>
 
-            <label class="term-item">
+            <label v-if="currentTerms?.marketing" class="term-item">
               <input v-model="aceitaMarketing" type="checkbox">
               <span>
                 Aceito receber comunicações e novidades por e-mail
+                <button type="button" class="term-link" @click="showMarketingDialog = true">
+                  Visualizar Consentimento de Comunicação
+                </button>
               </span>
             </label>
           </div>
@@ -289,6 +342,21 @@ function goToLogin() {
             Após o cadastro, sua conta ficará pendente até aprovação administrativa.
           </p>
         </form>
+        <div v-else class="success-state">
+          <UiAlert tone="info">
+            {{ feedbackMessage || 'Cadastro enviado com sucesso!' }}
+          </UiAlert>
+
+          <div class="login-form">
+            <p class="login-info">
+              Seu cadastro foi enviado e está aguardando aprovação.
+            </p>
+          </div>
+
+          <UiButton type="button" @click="goToLogin">
+            Ir para login
+          </UiButton>
+        </div>
       </UiCard>
     </main>
 
@@ -296,19 +364,28 @@ function goToLogin() {
 
     <div v-if="showTermsDialog" class="modal-overlay" @click.self="showTermsDialog = false">
       <div class="modal-card">
-        <h3>Termo de Uso</h3>
-        <p class="doc-version">Resumo informativo</p>
-        <div class="doc-content">Ao solicitar acesso, você confirma que utilizará a plataforma conforme as regras internas da organização e que as informações fornecidas no cadastro são verdadeiras.</div>
+        <h3>Termo de Uso - {{ currentTerms?.terms.type }}</h3>
+        <p class="doc-version">Version: {{ currentTerms?.terms.version }}</p>
+        <div class="doc-content">{{ currentTerms?.terms.content }}</div>
         <button type="button" class="modal-close" @click="showTermsDialog = false">Fechar</button>
       </div>
     </div>
 
     <div v-if="showPrivacyDialog" class="modal-overlay" @click.self="showPrivacyDialog = false">
       <div class="modal-card">
-        <h3>Aviso de Privacidade</h3>
-        <p class="doc-version">Resumo informativo</p>
-        <div class="doc-content">Os dados informados no cadastro serão usados para análise de acesso, autenticação e administração da sua conta, conforme necessidade operacional da plataforma.</div>
+        <h3>Aviso de Privacidade - {{ currentTerms?.privacy.type }}</h3>
+        <p class="doc-version">Version: {{ currentTerms?.privacy.version }}</p>
+        <div class="doc-content">{{ currentTerms?.privacy.content }}</div>
         <button type="button" class="modal-close" @click="showPrivacyDialog = false">Fechar</button>
+      </div>
+    </div>
+  
+    <div v-if="showMarketingDialog" class="modal-overlay" @click.self="showMarketingDialog = false">
+      <div class="modal-card">
+        <h3>Consentimento de Comunicação - {{ currentTerms?.marketing.type }}</h3>
+        <p class="doc-version">Version: {{ currentTerms?.marketing.version }}</p>
+        <div class="doc-content">{{ currentTerms?.marketing.content }}</div>
+        <button type="button" class="modal-close" @click="showMarketingDialog = false">Fechar</button>
       </div>
     </div>
   </div>

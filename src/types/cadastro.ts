@@ -9,7 +9,7 @@ export interface ConsentimentoDocumento {
 export interface ConsentimentosVigentesResponse {
   terms: ConsentimentoDocumento
   privacy: ConsentimentoDocumento
-  marketing: ConsentimentoDocumento | null
+  marketing: ConsentimentoDocumento
 }
 
 export interface UsuarioCadastroRequest {
@@ -17,7 +17,12 @@ export interface UsuarioCadastroRequest {
   email: string
   senha: string
   telefone?: string
-  termsIds: string[]
+  terms: AcceptedTerm[]
+}
+
+export interface AcceptedTerm {
+  id: string
+  version: number
 }
 
 export interface UsuarioCadastroResponse {
