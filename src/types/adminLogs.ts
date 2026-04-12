@@ -1,13 +1,15 @@
 export interface AdminLogResponse {
   id: number
-  timestamp: string
-  actorRef?: string
+  createdAt: string
+  actorRef: string | null
+  targetRef: string | null
   sourceType: string
   event: string
   result: string
-  description?: string
-  metadata?: string
-  createdByModule?: string
+  description: string
+  metadata: string | null
+  logCategory: string
+  createdByModule: string
 }
 
 export interface AdminLogsPageResponse {

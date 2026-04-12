@@ -41,7 +41,7 @@ export async function buscarDocumentosVigentes(): Promise<ConsentimentosVigentes
   const response = await fetch(`${API_BASE_URL}/documentos/consentimentos/vigentes`)
 
   if (!response.ok) {
-    throw new Error('Não foi possível carregar os documentos vigentes.')
+    throw new Error('Nao foi possivel carregar os documentos vigentes.')
   }
 
   return response.json() as Promise<ConsentimentosVigentesResponse>
@@ -70,7 +70,7 @@ export async function resolverPendenciasDeTermos(
     }
 
     const error = new Error(
-      String(errorBody.message ?? errorBody.mensagem ?? 'Não foi possível concluir a revisão dos termos.'),
+      String(errorBody.message ?? errorBody.mensagem ?? 'Nao foi possivel concluir a revisao dos termos.'),
     )
     Object.assign(error, {
       status: response.status,

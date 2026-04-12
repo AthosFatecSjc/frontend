@@ -7,12 +7,14 @@ import type { AdminLogsFilters } from '../types/adminLogs'
 
 type LogRow = {
   id: string
-  timestamp: string
+  createdAt: string
   origem: string
   usuario: string
+  alvo: string
   evento: string
   descricao: string
   resultado: string
+  categoria: string
   moduloResponsavel: string
 }
 
@@ -22,22 +24,22 @@ const EVENT_OPTIONS = [
   { value: 'LOGIN_ATTEMPT', label: 'Tentativa de login' },
   { value: 'LOGIN_SUCCESS', label: 'Login com sucesso' },
   { value: 'LOGIN_FAIL', label: 'Falha no login' },
-  { value: 'USER_REGISTER', label: 'Cadastro de usuário' },
-  { value: 'USER_APPROVED', label: 'Usuário ativado' },
-  { value: 'USER_REJECTED', label: 'Usuário rejeitado' },
-  { value: 'USER_EDITED', label: 'Usuário editado' },
-  { value: 'USER_ANONYMIZED', label: 'Usuário anonimizado' },
-  { value: 'USER_ANONYMIZATION_REAPPLIED', label: 'Reaplicação de anonimização' },
+  { value: 'USER_REGISTER', label: 'Cadastro de usuario' },
+  { value: 'USER_APPROVED', label: 'Usuario ativado' },
+  { value: 'USER_REJECTED', label: 'Usuario rejeitado' },
+  { value: 'USER_EDITED', label: 'Usuario editado' },
+  { value: 'USER_ANONYMIZED', label: 'Usuario anonimizado' },
+  { value: 'USER_ANONYMIZATION_REAPPLIED', label: 'Reaplicacao de anonimizacao' },
   { value: 'ADMIN_ROLE_GRANTED', label: 'Perfil de administrador concedido' },
   { value: 'ADMIN_ROLE_REMOVED', label: 'Perfil de administrador removido' },
-  { value: 'BACKUP_RESTORE_RECONCILIATION', label: 'Reconciliação de backup' },
-  { value: 'ANEEL_EXTRACTION_START', label: 'Extração ANEEL iniciada' },
-  { value: 'ANEEL_EXTRACTION_SUCCESS', label: 'Extração ANEEL com sucesso' },
-  { value: 'ANEEL_EXTRACTION_FAIL', label: 'Falha na extração ANEEL' },
+  { value: 'BACKUP_RESTORE_RECONCILIATION', label: 'Reconciliacao de backup' },
+  { value: 'ANEEL_EXTRACTION_START', label: 'Extracao ANEEL iniciada' },
+  { value: 'ANEEL_EXTRACTION_SUCCESS', label: 'Extracao ANEEL com sucesso' },
+  { value: 'ANEEL_EXTRACTION_FAIL', label: 'Falha na extracao ANEEL' },
 ] as const
 
 const SOURCE_LABEL_MAP: Record<string, string> = {
-  USER: 'Usuário',
+  USER: 'Usuario',
   SYSTEM: 'Sistema',
   JOB: 'Rotina',
 }
@@ -103,12 +105,14 @@ async function loadLogs() {
 
     logs.value = pageResponse.content.map<LogRow>((item) => ({
       id: String(item.id),
-      timestamp: item.timestamp,
+      createdAt: item.createdAt,
       origem: item.sourceType,
       usuario: item.actorRef?.trim() || '-',
+      alvo: item.targetRef?.trim() || '-',
       evento: item.event,
       descricao: item.description ?? '',
       resultado: item.result === 'SUCCESS' ? 'SUCCESS' : 'FAIL',
+      categoria: item.logCategory?.trim() || '-',
       moduloResponsavel: item.createdByModule?.trim() || '-',
     }))
 
@@ -137,12 +141,12 @@ async function loadLogs() {
 
 function applyFilters() {
   if ((filters.value.startDate && !filters.value.endDate) || (!filters.value.startDate && filters.value.endDate)) {
-    error.value = 'Preencha data inicial e data final para aplicar o filtro por período.'
+    error.value = 'Preencha data inicial e data final para aplicar o filtro por periodo.'
     return
   }
 
   if (filters.value.startDate && filters.value.endDate && filters.value.startDate > filters.value.endDate) {
-    error.value = 'A data inicial não pode ser maior que a data final.'
+    error.value = 'A data inicial nao pode ser maior que a data final.'
     return
   }
 
@@ -210,14 +214,14 @@ onMounted(() => {
 <template>
   <AuthenticatedLayout
     title="Logs e Auditoria"
-    description="Consulta de eventos críticos da plataforma para monitoramento técnico e rastreabilidade administrativa."
+    description="Consulta de eventos criticos da plataforma para monitoramento tecnico e rastreabilidade administrativa."
   >
     <div v-if="!isAdmin" class="state-container state-restricted">
       <div class="state-icon">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
       </div>
       <p class="state-title">Acesso restrito</p>
-      <p class="state-text">Área acessível apenas para administradores autorizados.</p>
+      <p class="state-text">Area acessivel apenas para administradores autorizados.</p>
     </div>
 
     <template v-else>
@@ -292,19 +296,23 @@ onMounted(() => {
             <tr>
               <th>Data / Hora</th>
               <th>Origem</th>
-              <th>Usuário</th>
+              <th>Ator</th>
+              <th>Alvo</th>
               <th>Evento</th>
-              <th>Descrição</th>
+              <th>Categoria</th>
+              <th>Descricao</th>
               <th>Status</th>
-              <th>Módulo responsável</th>
+              <th>Modulo responsavel</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="log in logs" :key="log.id">
-              <td class="td-mono">{{ formatDate(log.timestamp) }}</td>
+              <td class="td-mono">{{ formatDate(log.createdAt) }}</td>
               <td><UiBadge class="tag-source">{{ formatSource(log.origem) }}</UiBadge></td>
               <td class="td-placeholder">{{ log.usuario }}</td>
+              <td class="td-placeholder">{{ log.alvo }}</td>
               <td>{{ formatEvent(log.evento) }}</td>
+              <td><UiBadge class="tag-category">{{ log.categoria }}</UiBadge></td>
               <td class="td-description">{{ log.descricao }}</td>
               <td>
                 <UiBadge :tone="log.resultado === 'SUCCESS' ? 'success' : 'danger'">
@@ -338,7 +346,7 @@ onMounted(() => {
             </button>
           </div>
           <UiButton class="pag-btn" variant="secondary" :disabled="currentPage === totalPages" @click="nextPage">
-            Próxima
+            Proxima
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg>
           </UiButton>
         </div>
@@ -527,7 +535,7 @@ onMounted(() => {
 .logs-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 860px;
+  min-width: 1200px;
   font-size: 0.84rem;
 }
 
@@ -593,6 +601,14 @@ onMounted(() => {
   min-height: 1.8rem;
   padding: 0.2rem 0.7rem;
   letter-spacing: 0.04em;
+}
+
+.tag-category {
+  min-height: 1.8rem;
+  padding: 0.2rem 0.7rem;
+  letter-spacing: 0.04em;
+  background-color: #e9d5ff;
+  color: #5b21b6;
 }
 
 .pagination-section {
