@@ -9,7 +9,14 @@ type StoredAuthUser = Pick<LoginResponse, 'userId' | 'email' | 'nome'>
 
 function normalizeErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message.trim()) {
-    return error.message
+    const message = error.message.trim()
+    const normalizedMessage = message.toLowerCase()
+
+    if (normalizedMessage.includes('review') && normalizedMessage.includes('term')) {
+      return 'Ha termos vigentes pendentes. Revise-os antes de entrar na plataforma.'
+    }
+
+    return message
   }
 
   return fallback
@@ -114,14 +121,14 @@ export async function loginWithStorage(email: string, senha: string): Promise<Lo
     if (status === 401) {
       return {
         type: 'invalid',
-        message: 'Credenciais inválidas. Verifique seu e-mail e senha.',
+        message: 'Credenciais invalidas. Verifique seu e-mail e senha.',
       }
     }
 
     if (status === 403 && code === 'USER_PENDING_APPROVAL') {
       return {
         type: 'pending',
-        message: 'Seu cadastro está pendente de aprovação. Aguarde a análise do administrador.',
+        message: 'Seu cadastro esta pendente de aprovacao. Aguarde a analise do administrador.',
       }
     }
 
@@ -130,14 +137,14 @@ export async function loginWithStorage(email: string, senha: string): Promise<Lo
         type: 'rejected',
         message: reason
           ? `Seu acesso foi rejeitado. Motivo: ${reason}.`
-          : 'Seu acesso foi rejeitado. Entre em contato com o administrador para mais informações.',
+          : 'Seu acesso foi rejeitado. Entre em contato com o administrador para mais informacoes.',
       }
     }
 
     if (status === 403 && code === 'INVALID_USER_STATUS') {
       return {
         type: 'invalid',
-        message: 'Seu cadastro não está com status ativo. Entre em contato com o administrador.',
+        message: 'Seu cadastro nao esta com status ativo. Entre em contato com o administrador.',
       }
     }
 
@@ -149,14 +156,14 @@ export async function loginWithStorage(email: string, senha: string): Promise<Lo
 
       return {
         type: 'pending',
-        message: 'Há termos vigentes pendentes. Revise-os antes de entrar na plataforma.',
+        message: 'Ha termos vigentes pendentes. Revise-os antes de entrar na plataforma.',
         nextRoute: '/consentimentos-pendentes',
       }
     }
 
     return {
       type: 'invalid',
-      message: normalizeErrorMessage(error, 'Não foi possível realizar login.'),
+      message: normalizeErrorMessage(error, 'Nao foi possivel realizar login.'),
     }
   }
 }

@@ -62,7 +62,7 @@ async function carregarTela() {
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message
-      : 'Não foi possível carregar os documentos vigentes.'
+      : 'Nao foi possivel carregar os documentos vigentes.'
   } finally {
     isLoading.value = false
   }
@@ -88,7 +88,7 @@ async function confirmar() {
   } catch (error) {
     errorMessage.value = error instanceof Error
       ? error.message
-      : 'Não foi possível concluir a revisão dos termos.'
+      : 'Nao foi possivel concluir a revisao dos termos.'
   } finally {
     isSubmitting.value = false
   }
@@ -101,7 +101,7 @@ function sair() {
 }
 
 onMounted(() => {
-  carregarTela()
+  void carregarTela()
 })
 </script>
 
@@ -113,7 +113,7 @@ onMounted(() => {
           <AppHeading
             eyebrow="Consentimentos"
             title="Revise os termos antes de entrar"
-            subtitle="Quando uma versão vigente muda, o acesso fica bloqueado até você decidir sobre os documentos pendentes."
+            subtitle="Quando uma versao vigente muda, o acesso fica bloqueado ate voce decidir sobre os documentos pendentes."
             size="lg"
           />
         </header>
@@ -134,14 +134,14 @@ onMounted(() => {
           >
             <div class="document-meta">
               <strong>{{ documento.type }}</strong>
-              <span>Versão {{ documento.version }}</span>
+              <span>Versao {{ documento.version }}</span>
             </div>
             <div class="document-content">{{ documento.content }}</div>
           </section>
 
           <label v-if="optionalPendingIds.length" class="marketing-choice">
             <input v-model="aceitarMarketing" type="checkbox">
-            <span>Desejo aceitar o consentimento opcional de comunicação vigente.</span>
+            <span>Desejo aceitar o consentimento opcional de comunicacao vigente.</span>
           </label>
 
           <div class="confirmation-block">
