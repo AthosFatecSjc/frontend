@@ -7,7 +7,7 @@ import type { AdminLogsFilters } from '../types/adminLogs'
 
 type LogRow = {
   id: string
-  timestamp: string
+  createdAt: string
   origem: string
   usuario: string
   alvo: string
@@ -99,7 +99,7 @@ async function loadLogs() {
 
     logs.value = pageResponse.content.map<LogRow>((item) => ({
       id: String(item.id),
-      timestamp: item.timestamp,
+      createdAt: item.createdAt,
       origem: item.sourceType,
       usuario: item.actorRef?.trim() || '-',
       alvo: item.targetRef?.trim() || '-',
@@ -297,7 +297,7 @@ onMounted(() => {
           </thead>
           <tbody>
             <tr v-for="log in logs" :key="log.id">
-              <td class="td-mono">{{ formatDate(log.timestamp) }}</td>
+              <td class="td-mono">{{ formatDate(log.createdAt) }}</td>
               <td><UiBadge class="tag-source">{{ log.origem }}</UiBadge></td>
               <td class="td-placeholder">{{ log.usuario }}</td>
               <td class="td-placeholder">{{ log.alvo }}</td>
