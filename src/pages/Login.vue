@@ -39,7 +39,7 @@ async function onSubmit() {
   } catch {
     status.value = {
       type: 'invalid',
-      message: 'Não foi possível realizar login. Tente novamente.',
+      message: 'Nao foi possivel realizar login. Tente novamente.',
     }
   } finally {
     isLoading.value = false
@@ -62,7 +62,7 @@ function goToRegister() {
             <span>TECSYS</span>
           </div>
         </div>
-        <span class="topbar-badge">PLATAFORMA ANALÍTICA</span>
+        <span class="topbar-badge">PLATAFORMA ANALITICA</span>
       </div>
     </header>
 
@@ -70,9 +70,9 @@ function goToRegister() {
       <UiCard class="login-card">
         <header class="login-head">
           <AppHeading
-            eyebrow="Autenticação"
+            eyebrow="Autenticacao"
             title="Entrar na plataforma"
-            subtitle="O acesso está disponível apenas para usuários com conta ativa."
+            subtitle="O acesso esta disponivel apenas para usuarios com conta ativa."
             size="lg"
           />
         </header>
@@ -111,7 +111,7 @@ function goToRegister() {
           </UiButton>
 
           <div class="login-footer">
-            <span>Ainda não possui acesso?</span>
+            <span>Ainda nao possui acesso?</span>
             <button type="button" @click="goToRegister">Solicitar acesso</button>
           </div>
         </form>
