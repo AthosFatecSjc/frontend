@@ -1,5 +1,6 @@
 import type { BackendAuthError, LoginResponse, LoginResult } from '../types/auth'
 import { API_BASE_URL } from './api'
+import { storePendingTermsContext } from './termsService'
 
 const ACCESS_TOKEN_STORAGE_KEY = 'accessToken'
 const AUTH_USER_STORAGE_KEY = 'authUser'
@@ -78,6 +79,7 @@ export async function login(email: string, senha: string): Promise<LoginResponse
     status: response.status,
     code: errorBody.code,
     reason: errorBody.reason,
+    details: errorBody.details,
   })
   throw error
 }
@@ -105,6 +107,9 @@ export async function loginWithStorage(email: string, senha: string): Promise<Lo
     const reason = typeof error === 'object' && error !== null && 'reason' in error && error.reason
       ? String(error.reason)
       : undefined
+    const details = typeof error === 'object' && error !== null && 'details' in error
+      ? (error.details as BackendAuthError['details'])
+      : undefined
 
     if (status === 401) {
       return {
@@ -126,6 +131,26 @@ export async function loginWithStorage(email: string, senha: string): Promise<Lo
         message: reason
           ? `Seu acesso foi rejeitado. Motivo: ${reason}.`
           : 'Seu acesso foi rejeitado. Entre em contato com o administrador para mais informações.',
+      }
+    }
+
+    if (status === 403 && code === 'INVALID_USER_STATUS') {
+      return {
+        type: 'invalid',
+        message: 'Seu cadastro não está com status ativo. Entre em contato com o administrador.',
+      }
+    }
+
+    if (status === 403 && code === 'TERMS_REVIEW_REQUIRED' && details?.pendingTerms?.length) {
+      storePendingTermsContext({
+        email,
+        pendingTerms: details.pendingTerms,
+      })
+
+      return {
+        type: 'pending',
+        message: 'Há termos vigentes pendentes. Revise-os antes de entrar na plataforma.',
+        nextRoute: '/consentimentos-pendentes',
       }
     }
 

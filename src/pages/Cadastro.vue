@@ -175,7 +175,7 @@ function goToLogin() {
             <span>TECSYS</span>
           </div>
         </div>
-        <span class="topbar-badge">PLATAFORMA ANALITICA</span>
+        <span class="topbar-badge">PLATAFORMA ANALÍTICA</span>
       </div>
     </header>
 
@@ -297,7 +297,7 @@ function goToLogin() {
     <div v-if="showTermsDialog" class="modal-overlay" @click.self="showTermsDialog = false">
       <div class="modal-card">
         <h3>Termo de Uso</h3>
-        <p class="doc-version">Versão local</p>
+        <p class="doc-version">Resumo informativo</p>
         <div class="doc-content">Ao solicitar acesso, você confirma que utilizará a plataforma conforme as regras internas da organização e que as informações fornecidas no cadastro são verdadeiras.</div>
         <button type="button" class="modal-close" @click="showTermsDialog = false">Fechar</button>
       </div>
@@ -306,7 +306,7 @@ function goToLogin() {
     <div v-if="showPrivacyDialog" class="modal-overlay" @click.self="showPrivacyDialog = false">
       <div class="modal-card">
         <h3>Aviso de Privacidade</h3>
-        <p class="doc-version">Versão local</p>
+        <p class="doc-version">Resumo informativo</p>
         <div class="doc-content">Os dados informados no cadastro serão usados para análise de acesso, autenticação e administração da sua conta, conforme necessidade operacional da plataforma.</div>
         <button type="button" class="modal-close" @click="showPrivacyDialog = false">Fechar</button>
       </div>

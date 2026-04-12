@@ -30,7 +30,7 @@ async function onSubmit() {
   try {
     const result = await loginWithStorage(email.value, senha.value)
 
-    if (result.type === 'success' && result.nextRoute) {
+    if (result.nextRoute) {
       await router.push(result.nextRoute)
       return
     }
@@ -56,13 +56,13 @@ function goToRegister() {
     <header class="login-topbar">
       <div class="login-topbar-inner">
         <div class="brand-lockup">
-          <img class="brand-icon" :src="logoImage" alt="HiAthos" />
+          <img class="brand-icon" :src="logoImage" alt="HiATHOS" />
           <div class="brand-copy">
-            <strong>HiAthos</strong>
+            <strong>HiATHOS</strong>
             <span>TECSYS</span>
           </div>
         </div>
-        <span class="topbar-badge">PLATAFORMA ANALITICA</span>
+        <span class="topbar-badge">PLATAFORMA ANALÍTICA</span>
       </div>
     </header>
 
@@ -70,9 +70,9 @@ function goToRegister() {
       <UiCard class="login-card">
         <header class="login-head">
           <AppHeading
-            eyebrow="Autenticacao"
+            eyebrow="Autenticação"
             title="Entrar na plataforma"
-            subtitle="O acesso esta disponivel apenas para usuarios aprovados."
+            subtitle="O acesso está disponível apenas para usuários com conta ativa."
             size="lg"
           />
         </header>
@@ -111,7 +111,7 @@ function goToRegister() {
           </UiButton>
 
           <div class="login-footer">
-            <span>Ainda nao possui acesso?</span>
+            <span>Ainda não possui acesso?</span>
             <button type="button" @click="goToRegister">Solicitar acesso</button>
           </div>
         </form>
