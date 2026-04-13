@@ -9,7 +9,6 @@ import type {
   BackendErrorResponse,
   UsuarioCadastroRequest,
   ConsentimentosVigentesResponse,
-  AcceptedTerm
 } from '../types/cadastro'
 
 type FeedbackTone = 'info' | 'danger'
@@ -116,35 +115,17 @@ function validateForm() {
     setDangerFeedback('Você precisa confirmar ciência do Aviso de Privacidade.')
     isValid = false
   }
+  
 
   return isValid
 }
 
-function mountTerms() {
-  let acceptedTerms: AcceptedTerm[] = []
-  
-  if (aceitaTermo.value && currentTerms.value?.terms) {
-    acceptedTerms.push({
-      id: currentTerms.value.terms.documentId,
-      version: currentTerms.value.terms.version,
-    })
-  }
-
-  if (aceitaPrivacidade.value && currentTerms.value?.privacy) {
-    acceptedTerms.push({
-      id: currentTerms.value.privacy.documentId,
-      version: currentTerms.value.privacy.version,
-    })
-  }
-
-  if (aceitaMarketing.value && currentTerms.value?.marketing) {
-    acceptedTerms.push({
-      id: currentTerms.value.marketing.documentId,
-      version: currentTerms.value.marketing.version,
-    })
-  }
-
-  return acceptedTerms
+function montarTermsNames() {
+  const terms = [];
+  if (aceitaTermo.value) terms.push("TERMS_OF_USE");
+  if (aceitaPrivacidade.value) terms.push("PRIVACY_POLICY");
+  if (aceitaMarketing.value) terms.push("MARKETING_COMMUNICATION");
+  return terms;
 }
 
 async function onSubmit() {
@@ -158,7 +139,7 @@ async function onSubmit() {
     nomeCompleto: nome.value.trim(),
     email: email.value.trim(),
     senha: senha.value,
-    terms: mountTerms(),
+    termsNames: montarTermsNames(),
   }
 
   if (telefone.value.trim()) {
@@ -241,10 +222,6 @@ onMounted(() => {
         </header>
 
         <form v-if="!isSuccess" class="login-form" @submit.prevent="onSubmit">
-          <UiAlert v-if="feedbackMessage" :tone="feedbackTone">
-            {{ feedbackMessage }}
-          </UiAlert>
-
           <div class="login-field">
             <UiLabel for="cadastro-nome">Nome completo *</UiLabel>
             <UiInput
@@ -328,6 +305,10 @@ onMounted(() => {
               </span>
             </label>
           </div>
+
+          <UiAlert v-if="feedbackMessage" :tone="feedbackTone">
+            {{ feedbackMessage }}
+          </UiAlert>
 
           <UiButton class="login-submit" type="submit" :disabled="isSubmitDisabled">
             {{ submitText }}

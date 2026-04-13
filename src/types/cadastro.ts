@@ -17,12 +17,7 @@ export interface UsuarioCadastroRequest {
   email: string
   senha: string
   telefone?: string
-  terms: AcceptedTerm[]
-}
-
-export interface AcceptedTerm {
-  id: string
-  version: number
+  termsNames: string[]
 }
 
 export interface UsuarioCadastroResponse {
