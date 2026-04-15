@@ -20,6 +20,7 @@ export interface LoginResponse {
   userId: string
   email: string
   nome: string
+  role?: string | null
 }
 
 export interface BackendAuthError {

@@ -5,7 +5,23 @@ import { storePendingTermsContext } from './termsService'
 const ACCESS_TOKEN_STORAGE_KEY = 'accessToken'
 const AUTH_USER_STORAGE_KEY = 'authUser'
 
-type StoredAuthUser = Pick<LoginResponse, 'userId' | 'email' | 'nome'>
+type StoredAuthUser = Pick<LoginResponse, 'userId' | 'email' | 'nome' | 'role'>
+
+export function isAdminRole(role?: string | null) {
+  if (!role) return false
+
+  return ['ADMIN', 'ADM', 'ADMINISTRADOR'].includes(role.trim().toUpperCase())
+}
+
+export function hasAdminAccess() {
+  const role = getAuthUser()?.role
+
+  if (!role) {
+    return true
+  }
+
+  return isAdminRole(role)
+}
 
 function normalizeErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message.trim()) {
@@ -52,6 +68,7 @@ export function storeAuthSession(payload: LoginResponse) {
     userId: payload.userId,
     email: payload.email,
     nome: payload.nome,
+    role: payload.role ?? null,
   }))
 }
 
