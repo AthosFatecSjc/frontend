@@ -26,7 +26,7 @@ type UserApiRow = {
   email: string
   telefone: string | null
   status: UserStatus
-  role: UserRole
+  role: string
   dataCadastro: string
 }
 
@@ -49,7 +49,7 @@ const filters = reactive<FilterState>({
 const selectedUserId = ref('')
 const selectedDialog = ref<DialogType | null>(null)
 const rejectJustification = ref('')
-const roleToggleChecked = ref(false)
+const roleChangeTargetRole = ref<UserRole>('ADMIN')
 const isSubmittingRoleChange = ref(false)
 
 const editForm = reactive({
@@ -87,7 +87,7 @@ function normalizeUser(apiUser: UserApiRow): UserRow {
     email: apiUser.email,
     telefone: apiUser.telefone?.trim() ? apiUser.telefone : '-',
     status: apiUser.status,
-    role: apiUser.role,
+    role: apiUser.role.trim().toLowerCase() === 'admin' ? 'ADMIN' : 'USUARIO',
     dataCadastro: apiUser.dataCadastro,
   }
 }
@@ -142,7 +142,7 @@ function statusLabel(status: UserStatus) {
 }
 
 function roleLabel(role: UserRole) {
-  return role === 'ADMIN' ? 'Admin' : 'Usuário'
+  return role === 'ADMIN' ? 'ADMIN' : 'USUÁRIO'
 }
 
 function statusTone(status: UserStatus) {
@@ -168,7 +168,7 @@ function openDialog(type: DialogType, user: UserRow) {
   }
 
   if (type === 'role') {
-    roleToggleChecked.value = user.role === 'ADMIN'
+    roleChangeTargetRole.value = user.role === 'ADMIN' ? 'USUARIO' : 'ADMIN'
   }
 }
 
@@ -271,7 +271,7 @@ async function confirmRoleChange() {
   errorMessage.value = ''
 
   try {
-    const roleName = roleToggleChecked.value ? 'admin' : 'user'
+    const roleName = roleChangeTargetRole.value === 'ADMIN' ? 'admin' : 'user'
     const response = await fetch(
       `${API_BASE_URL}/admin/usuarios/${selectedUser.value.id}/role`,
       {
@@ -347,11 +347,11 @@ onMounted(() => {
           </div>
 
           <div class="field-group">
-            <UiLabel for="role-filter">Filtrar por role</UiLabel>
+            <UiLabel for="role-filter">Filtrar por perfil</UiLabel>
             <select id="role-filter" v-model="filters.role" class="field-select">
               <option value="">Todos</option>
-              <option value="ADMIN">Admin</option>
-              <option value="USUARIO">Usuário comum</option>
+              <option value="ADMIN">ADMIN</option>
+              <option value="USUARIO">USUÁRIO</option>
             </select>
           </div>
 
@@ -393,7 +393,7 @@ onMounted(() => {
                 <th>E-mail</th>
                 <th>Telefone</th>
                 <th>Status</th>
-                <th>Role</th>
+                <th>Perfil</th>
                 <th>Data de cadastro</th>
                 <th>Ações</th>
               </tr>
@@ -552,29 +552,22 @@ onMounted(() => {
       <div v-else-if="selectedDialog === 'role' && selectedUser" class="modal-card modal-card--compact">
         <button type="button" class="modal-close" aria-label="Fechar" @click="closeDialog">×</button>
         <p class="modal-title modal-title--compact">Alterar perfil do usuário</p>
-        <p class="modal-description">Marque para conceder perfil de administrador ou desmarque para retornar ao usuário comum.</p>
-
-        <div class="role-modal-switch">
-          <div :class="['role-switch', { 'role-switch--admin': roleToggleChecked }]">
-            <span class="role-switch-label" :class="{ 'role-switch-label--inactive': roleToggleChecked }">Usuário</span>
-            <button
-              type="button"
-              :class="['role-switch-toggle', { 'role-switch-toggle--admin': roleToggleChecked }]"
-              @click="roleToggleChecked = !roleToggleChecked"
-              :disabled="isSubmittingRoleChange"
-            >
-              <span class="role-switch-slider" />
-            </button>
-            <span class="role-switch-label" :class="{ 'role-switch-label--inactive': !roleToggleChecked }">Admin</span>
-          </div>
-        </div>
+        <p class="modal-description">
+          {{ roleChangeTargetRole === 'ADMIN'
+            ? 'Tem certeza que deseja tornar este usuário ADMIN?'
+            : 'Tem certeza que deseja voltar este usuário para USUÁRIO?'
+          }}
+        </p>
 
         <div class="modal-actions">
           <UiButton variant="secondary" class="modal-action" @click="closeDialog" :disabled="isSubmittingRoleChange">
             Cancelar
           </UiButton>
           <UiButton class="modal-action" @click="confirmRoleChange" :disabled="isSubmittingRoleChange">
-            {{ isSubmittingRoleChange ? 'Atualizando...' : 'Confirmar' }}
+            {{ isSubmittingRoleChange
+              ? 'Atualizando...'
+              : (roleChangeTargetRole === 'ADMIN' ? 'Sim, tornar ADMIN' : 'Sim, tornar USUÁRIO')
+            }}
           </UiButton>
         </div>
       </div>
@@ -765,80 +758,6 @@ onMounted(() => {
 
 .role-toggle-button--active .role-toggle-slider {
   transform: translateX(1.45rem);
-}
-
-.role-modal-switch {
-  padding: 1.2rem 1rem;
-  background: #f8fbff;
-  border-radius: 1rem;
-  border: 1px solid #dbe5f0;
-}
-
-.role-switch {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  width: 100%;
-}
-
-.role-switch--admin {
-}
-
-.role-switch-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #0f8ab3;
-  transition: color 0.3s ease;
-}
-
-.role-switch-label--inactive {
-  color: #94a3b8;
-}
-
-.role-switch-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 3.2rem;
-  height: 1.8rem;
-  border: none;
-  border-radius: 0.9rem;
-  background: #e8f4f9;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  padding: 0.2rem;
-  flex: 0 0 auto;
-}
-
-.role-switch-toggle:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.role-switch-toggle:hover:not(:disabled) {
-  background: #d4effc;
-}
-
-.role-switch-toggle--admin {
-  background: #0f8ab3;
-}
-
-.role-switch-toggle--admin:hover:not(:disabled) {
-  background: #0d6991;
-}
-
-.role-switch-slider {
-  display: inline-block;
-  width: 1.4rem;
-  height: 1.4rem;
-  border-radius: 0.7rem;
-  background: #fff;
-  transition: transform 0.3s ease;
-}
-
-.role-switch-toggle--admin .role-switch-slider {
-  transform: translateX(100%);
 }
 
 .action-row {
