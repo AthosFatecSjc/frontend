@@ -20,45 +20,15 @@ type UserRow = {
   justificativa?: string
 }
 
-const initialUsers: UserRow[] = [
-  {
-    id: '1',
-    nomeCompleto: 'Administrador',
-    email: 'admin@tecsys.com',
-    telefone: '-',
-    status: 'ATIVO',
-    role: 'ADMIN',
-    dataCadastro: '2026-03-23T16:31:00',
-  },
-  {
-    id: '2',
-    nomeCompleto: 'Ruth',
-    email: 'ruth@gmail.com',
-    telefone: '(12) 98703-8248',
-    status: 'PENDENTE',
-    role: 'USUARIO',
-    dataCadastro: '2026-03-23T16:31:00',
-  },
-  {
-    id: '3',
-    nomeCompleto: 'Marina Lopes',
-    email: 'marina.lopes@empresa.com',
-    telefone: '(11) 98888-2222',
-    status: 'ATIVO',
-    role: 'USUARIO',
-    dataCadastro: '2026-03-20T10:15:00',
-  },
-  {
-    id: '4',
-    nomeCompleto: 'Carlos Almeida',
-    email: 'carlos@empresa.com',
-    telefone: '(21) 97777-3434',
-    status: 'REJEITADO',
-    role: 'USUARIO',
-    dataCadastro: '2026-03-18T08:45:00',
-    justificativa: 'Dados incompletos no processo de cadastro.',
-  },
-]
+type UserApiRow = {
+  id: string
+  nomeCompleto: string
+  email: string
+  telefone: string | null
+  status: UserStatus
+  role: UserRole
+  dataCadastro: string
+}
 
 type FilterState = {
   query: string
@@ -66,7 +36,7 @@ type FilterState = {
   role: '' | UserRole
 }
 
-const users = ref<UserRow[]>(initialUsers)
+const users = ref<UserRow[]>([])
 const isLoading = ref(false)
 const errorMessage = ref('')
 const feedbackMessage = ref('')
@@ -109,6 +79,43 @@ const totalRecords = computed(() => filteredUsers.value.length)
 const paginationStart = computed(() => (totalRecords.value === 0 ? 0 : 1))
 
 const paginationEnd = computed(() => totalRecords.value)
+
+function normalizeUser(apiUser: UserApiRow): UserRow {
+  return {
+    id: apiUser.id,
+    nomeCompleto: apiUser.nomeCompleto,
+    email: apiUser.email,
+    telefone: apiUser.telefone?.trim() ? apiUser.telefone : '-',
+    status: apiUser.status,
+    role: apiUser.role,
+    dataCadastro: apiUser.dataCadastro,
+  }
+}
+
+async function loadUsers() {
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/admin/usuarios`,
+      createProtectedJsonRequest(),
+    )
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}))
+      throw new Error(errorBody.message || 'Falha ao carregar usuários')
+    }
+
+    const data = await response.json() as UserApiRow[]
+    users.value = data.map(normalizeUser)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Erro ao carregar usuários'
+    users.value = []
+  } finally {
+    isLoading.value = false
+  }
+}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -178,34 +185,69 @@ function applyLocalUpdate(updater: (user: UserRow) => UserRow) {
   })
 }
 
-function confirmApprove() {
+async function confirmApprove() {
   if (!selectedUser.value) return
 
-  applyLocalUpdate(user => ({
-    ...user,
-    status: 'ATIVO',
-  }))
+  isLoading.value = true
+  errorMessage.value = ''
 
-  feedbackMessage.value = `${selectedUser.value.nomeCompleto} foi aprovada(o) no fluxo local de front.`
-  closeDialog()
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/admin/usuarios/${selectedUser.value.id}/status`,
+      {
+        ...createProtectedJsonRequest(),
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'ATIVO', motivo: null }),
+      },
+    )
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}))
+      throw new Error(errorBody.message || 'Falha ao aprovar usuário')
+    }
+
+    feedbackMessage.value = `${selectedUser.value.nomeCompleto} foi aprovada(o) com sucesso.`
+    closeDialog()
+    await loadUsers()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Erro ao aprovar usuário'
+  } finally {
+    isLoading.value = false
+  }
 }
 
-function confirmReject() {
+async function confirmReject() {
   if (!selectedUser.value || !rejectJustification.value.trim()) {
     errorMessage.value = 'Informe a justificativa da rejeição.'
     return
   }
 
-  const reason = rejectJustification.value.trim()
+  isLoading.value = true
+  errorMessage.value = ''
 
-  applyLocalUpdate(user => ({
-    ...user,
-    status: 'REJEITADO',
-    justificativa: reason,
-  }))
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/admin/usuarios/${selectedUser.value.id}/status`,
+      {
+        ...createProtectedJsonRequest(),
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'REJEITADO', motivo: rejectJustification.value.trim() }),
+      },
+    )
 
-  feedbackMessage.value = `${selectedUser.value.nomeCompleto} foi rejeitada(o) no fluxo local de front.`
-  closeDialog()
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}))
+      throw new Error(errorBody.message || 'Falha ao rejeitar usuário')
+    }
+
+    feedbackMessage.value = `${selectedUser.value.nomeCompleto} foi rejeitada(o) com sucesso.`
+    closeDialog()
+    await loadUsers()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Erro ao rejeitar usuário'
+  } finally {
+    isLoading.value = false
+  }
 }
 
 function confirmSaveEdit() {
@@ -231,7 +273,7 @@ async function confirmRoleChange() {
   try {
     const roleName = roleToggleChecked.value ? 'admin' : 'user'
     const response = await fetch(
-      `${API_BASE_URL}/usuarios/${selectedUser.value.id}/role`,
+      `${API_BASE_URL}/admin/usuarios/${selectedUser.value.id}/role`,
       {
         ...createProtectedJsonRequest(),
         method: 'PATCH',
@@ -244,13 +286,9 @@ async function confirmRoleChange() {
       throw new Error(errorBody.message || 'Falha ao alterar role do usuário')
     }
 
-    applyLocalUpdate(user => ({
-      ...user,
-      role: roleToggleChecked.value ? 'ADMIN' : 'USUARIO',
-    }))
-
     feedbackMessage.value = `Perfil de ${selectedUser.value.nomeCompleto} atualizado com sucesso.`
     closeDialog()
+    await loadUsers()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Erro ao alterar role'
   } finally {
@@ -270,7 +308,7 @@ function openRoleChangeDialog(user: UserRow) {
 }
 
 onMounted(() => {
-  isLoading.value = false
+  loadUsers()
 })
 </script>
 
@@ -377,11 +415,10 @@ onMounted(() => {
                       v-if="user.status === 'ATIVO'"
                       type="button"
                       :class="['role-toggle-button', { 'role-toggle-button--active': user.role === 'ADMIN' }]"
+                      :aria-label="`Alternar perfil de ${user.nomeCompleto}`"
                       @click="openRoleChangeDialog(user)"
                     >
-                      <span class="role-toggle-label role-toggle-label--left">Usuário</span>
                       <span class="role-toggle-slider" />
-                      <span class="role-toggle-label role-toggle-label--right">Admin</span>
                     </button>
                   </div>
                 </td>
@@ -688,37 +725,17 @@ onMounted(() => {
   gap: 0.55rem;
 }
 
-.role-toggle,
-.role-modal-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  font-size: 0.88rem;
-  color: #475569;
-}
-
-.role-toggle input,
-.role-modal-toggle input {
-  width: 1rem;
-  height: 1rem;
-  accent-color: #0f8ab3;
-}
-
 .role-toggle-button {
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  max-width: 8rem;
+  width: 3.5rem;
   height: 2rem;
-  padding: 0.3rem;
+  padding: 0.2rem;
   border: 2px solid #d1e7f0;
   border-radius: 1rem;
   background: #f0f8fb;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-size: 0.75rem;
-  font-weight: 600;
 }
 
 .role-toggle-button:disabled {
@@ -733,37 +750,21 @@ onMounted(() => {
 
 .role-toggle-button--active {
   border-color: #0f8ab3;
-  background: #d4effc;
-}
-
-.role-toggle-label {
-  padding: 0 0.4rem;
-  color: #60758c;
-  transition: color 0.3s ease;
-  flex: 0 0 auto;
-}
-
-.role-toggle-button--active .role-toggle-label--left {
-  color: #94a3b8;
-}
-
-.role-toggle-button--active .role-toggle-label--right {
-  color: #0f8ab3;
+  background: #0f8ab3;
 }
 
 .role-toggle-slider {
   display: inline-block;
-  width: 1.4rem;
-  height: 1.4rem;
-  border-radius: 0.8rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
   background: #fff;
-  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.22);
   transition: transform 0.3s ease;
-  flex: 0 0 auto;
 }
 
 .role-toggle-button--active .role-toggle-slider {
-  transform: translateX(calc(100% + 0.2rem));
+  transform: translateX(1.45rem);
 }
 
 .role-modal-switch {
