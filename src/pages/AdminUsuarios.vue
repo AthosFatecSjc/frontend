@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout.vue'
 import { hasAdminAccess } from '@/services/authService'
+import { API_BASE_URL, createProtectedJsonRequest } from '@/services/api'
 
 type UserStatus = 'ATIVO' | 'PENDENTE' | 'REJEITADO'
 type UserRole = 'ADMIN' | 'USUARIO'
@@ -79,6 +80,7 @@ const selectedUserId = ref('')
 const selectedDialog = ref<DialogType | null>(null)
 const rejectJustification = ref('')
 const roleToggleChecked = ref(false)
+const isSubmittingRoleChange = ref(false)
 
 const editForm = reactive({
   nomeCompleto: '',
@@ -163,16 +165,10 @@ function openDialog(type: DialogType, user: UserRow) {
   }
 }
 
-function openRoleDialog(user: UserRow, event: Event) {
-  openDialog('role', user)
-
-  const target = event.target as HTMLInputElement | null
-  roleToggleChecked.value = Boolean(target?.checked)
-}
-
 function closeDialog() {
   selectedDialog.value = null
   selectedUserId.value = ''
+  isSubmittingRoleChange.value = false
 }
 
 function applyLocalUpdate(updater: (user: UserRow) => UserRow) {
@@ -226,22 +222,51 @@ function confirmSaveEdit() {
   closeDialog()
 }
 
-function confirmRoleChange() {
+async function confirmRoleChange() {
   if (!selectedUser.value) return
 
-  applyLocalUpdate(user => ({
-    ...user,
-    role: roleToggleChecked.value ? 'ADMIN' : 'USUARIO',
-  }))
+  isSubmittingRoleChange.value = true
+  errorMessage.value = ''
 
-  feedbackMessage.value = `${selectedUser.value.nomeCompleto} teve o perfil ajustado localmente.`
-  closeDialog()
+  try {
+    const roleName = roleToggleChecked.value ? 'admin' : 'user'
+    const response = await fetch(
+      `${API_BASE_URL}/usuarios/${selectedUser.value.id}/role`,
+      {
+        ...createProtectedJsonRequest(),
+        method: 'PATCH',
+        body: JSON.stringify({ roleName }),
+      }
+    )
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}))
+      throw new Error(errorBody.message || 'Falha ao alterar role do usuário')
+    }
+
+    applyLocalUpdate(user => ({
+      ...user,
+      role: roleToggleChecked.value ? 'ADMIN' : 'USUARIO',
+    }))
+
+    feedbackMessage.value = `Perfil de ${selectedUser.value.nomeCompleto} atualizado com sucesso.`
+    closeDialog()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Erro ao alterar role'
+  } finally {
+    isSubmittingRoleChange.value = false
+  }
 }
 
 function resetFilters() {
   filters.query = ''
   filters.status = ''
   filters.role = ''
+}
+
+function openRoleChangeDialog(user: UserRow) {
+  if (user.status !== 'ATIVO') return
+  openDialog('role', user)
 }
 
 onMounted(() => {
@@ -348,14 +373,16 @@ onMounted(() => {
                 <td>
                   <div class="role-cell">
                     <UiBadge :tone="user.role === 'ADMIN' ? 'success' : 'neutral'">{{ roleLabel(user.role) }}</UiBadge>
-                    <label class="role-toggle">
-                      <input
-                        type="checkbox"
-                        :checked="user.role === 'ADMIN'"
-                        @change="openRoleDialog(user, $event)"
-                      >
-                      <span>Tornar admin</span>
-                    </label>
+                    <button
+                      v-if="user.status === 'ATIVO'"
+                      type="button"
+                      :class="['role-toggle-button', { 'role-toggle-button--active': user.role === 'ADMIN' }]"
+                      @click="openRoleChangeDialog(user)"
+                    >
+                      <span class="role-toggle-label role-toggle-label--left">Usuário</span>
+                      <span class="role-toggle-slider" />
+                      <span class="role-toggle-label role-toggle-label--right">Admin</span>
+                    </button>
                   </div>
                 </td>
                 <td>{{ formatDate(user.dataCadastro) }}</td>
@@ -490,14 +517,28 @@ onMounted(() => {
         <p class="modal-title modal-title--compact">Alterar perfil do usuário</p>
         <p class="modal-description">Marque para conceder perfil de administrador ou desmarque para retornar ao usuário comum.</p>
 
-        <label class="role-modal-toggle">
-          <input v-model="roleToggleChecked" type="checkbox">
-          <span>Usuário é administrador</span>
-        </label>
+        <div class="role-modal-switch">
+          <div :class="['role-switch', { 'role-switch--admin': roleToggleChecked }]">
+            <span class="role-switch-label" :class="{ 'role-switch-label--inactive': roleToggleChecked }">Usuário</span>
+            <button
+              type="button"
+              :class="['role-switch-toggle', { 'role-switch-toggle--admin': roleToggleChecked }]"
+              @click="roleToggleChecked = !roleToggleChecked"
+              :disabled="isSubmittingRoleChange"
+            >
+              <span class="role-switch-slider" />
+            </button>
+            <span class="role-switch-label" :class="{ 'role-switch-label--inactive': !roleToggleChecked }">Admin</span>
+          </div>
+        </div>
 
         <div class="modal-actions">
-          <UiButton variant="secondary" class="modal-action" @click="closeDialog">Cancelar</UiButton>
-          <UiButton class="modal-action" @click="confirmRoleChange">Confirmar</UiButton>
+          <UiButton variant="secondary" class="modal-action" @click="closeDialog" :disabled="isSubmittingRoleChange">
+            Cancelar
+          </UiButton>
+          <UiButton class="modal-action" @click="confirmRoleChange" :disabled="isSubmittingRoleChange">
+            {{ isSubmittingRoleChange ? 'Atualizando...' : 'Confirmar' }}
+          </UiButton>
         </div>
       </div>
     </div>
@@ -661,6 +702,142 @@ onMounted(() => {
   width: 1rem;
   height: 1rem;
   accent-color: #0f8ab3;
+}
+
+.role-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 8rem;
+  height: 2rem;
+  padding: 0.3rem;
+  border: 2px solid #d1e7f0;
+  border-radius: 1rem;
+  background: #f0f8fb;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.role-toggle-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.role-toggle-button:hover:not(:disabled) {
+  border-color: #0f8ab3;
+  background: #e8f4f9;
+}
+
+.role-toggle-button--active {
+  border-color: #0f8ab3;
+  background: #d4effc;
+}
+
+.role-toggle-label {
+  padding: 0 0.4rem;
+  color: #60758c;
+  transition: color 0.3s ease;
+  flex: 0 0 auto;
+}
+
+.role-toggle-button--active .role-toggle-label--left {
+  color: #94a3b8;
+}
+
+.role-toggle-button--active .role-toggle-label--right {
+  color: #0f8ab3;
+}
+
+.role-toggle-slider {
+  display: inline-block;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 0.8rem;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.1);
+  transition: transform 0.3s ease;
+  flex: 0 0 auto;
+}
+
+.role-toggle-button--active .role-toggle-slider {
+  transform: translateX(calc(100% + 0.2rem));
+}
+
+.role-modal-switch {
+  padding: 1.2rem 1rem;
+  background: #f8fbff;
+  border-radius: 1rem;
+  border: 1px solid #dbe5f0;
+}
+
+.role-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.role-switch--admin {
+}
+
+.role-switch-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0f8ab3;
+  transition: color 0.3s ease;
+}
+
+.role-switch-label--inactive {
+  color: #94a3b8;
+}
+
+.role-switch-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.2rem;
+  height: 1.8rem;
+  border: none;
+  border-radius: 0.9rem;
+  background: #e8f4f9;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0.2rem;
+  flex: 0 0 auto;
+}
+
+.role-switch-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.role-switch-toggle:hover:not(:disabled) {
+  background: #d4effc;
+}
+
+.role-switch-toggle--admin {
+  background: #0f8ab3;
+}
+
+.role-switch-toggle--admin:hover:not(:disabled) {
+  background: #0d6991;
+}
+
+.role-switch-slider {
+  display: inline-block;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 0.7rem;
+  background: #fff;
+  transition: transform 0.3s ease;
+}
+
+.role-switch-toggle--admin .role-switch-slider {
+  transform: translateX(100%);
 }
 
 .action-row {
