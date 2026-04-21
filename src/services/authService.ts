@@ -14,13 +14,7 @@ export function isAdminRole(role?: string | null) {
 }
 
 export function hasAdminAccess() {
-  const role = getAuthUser()?.role
-
-  if (!role) {
-    return true
-  }
-
-  return isAdminRole(role)
+  return isAdminRole(getAuthUser()?.role)
 }
 
 function normalizeErrorMessage(error: unknown, fallback: string) {
