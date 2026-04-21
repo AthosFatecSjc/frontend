@@ -30,6 +30,12 @@ type UserApiRow = {
   dataCadastro: string
 }
 
+type UserEditPayload = {
+  nomeCompleto: string
+  email: string
+  telefone: string | null
+}
+
 type FilterState = {
   query: string
   status: '' | UserStatus
@@ -160,7 +166,7 @@ function openDialog(type: DialogType, user: UserRow) {
   if (type === 'edit') {
     editForm.nomeCompleto = user.nomeCompleto
     editForm.email = user.email
-    editForm.telefone = user.telefone
+    editForm.telefone = user.telefone === '-' ? '' : user.telefone
   }
 
   if (type === 'reject') {
@@ -178,11 +184,46 @@ function closeDialog() {
   isSubmittingRoleChange.value = false
 }
 
-function applyLocalUpdate(updater: (user: UserRow) => UserRow) {
-  users.value = users.value.map((user) => {
-    if (user.id !== selectedUserId.value) return user
-    return updater(user)
-  })
+async function persistUserEdit(userId: string, payload: UserEditPayload) {
+  const candidateUrls = [
+    `${API_BASE_URL}/admin/usuarios/${userId}`,
+    `${API_BASE_URL}/admin/usuarios/${userId}/dados`,
+  ]
+  const candidateMethods: Array<'PATCH' | 'PUT'> = ['PATCH', 'PUT']
+  let lastError: Error | null = null
+
+  for (const url of candidateUrls) {
+    for (const method of candidateMethods) {
+      const response = await fetch(
+        url,
+        {
+          ...createProtectedJsonRequest(),
+          method,
+          body: JSON.stringify(payload),
+        },
+      )
+
+      if (response.ok) {
+        return
+      }
+
+      const errorBody = await response.json().catch(() => ({} as {
+        message?: string
+        mensagem?: string
+        error?: string
+      }))
+      const message = errorBody.message ?? errorBody.mensagem ?? errorBody.error ?? 'Falha ao salvar alterações do usuário'
+
+      if (response.status === 404 || response.status === 405) {
+        lastError = new Error(message)
+        continue
+      }
+
+      throw new Error(message)
+    }
+  }
+
+  throw lastError ?? new Error('Falha ao salvar alterações do usuário')
 }
 
 async function confirmApprove() {
@@ -250,18 +291,33 @@ async function confirmReject() {
   }
 }
 
-function confirmSaveEdit() {
+async function confirmSaveEdit() {
   if (!selectedUser.value) return
 
-  applyLocalUpdate(user => ({
-    ...user,
+  const payload: UserEditPayload = {
     nomeCompleto: editForm.nomeCompleto.trim(),
     email: editForm.email.trim(),
-    telefone: editForm.telefone.trim(),
-  }))
+    telefone: editForm.telefone.trim() || null,
+  }
 
-  feedbackMessage.value = 'Dados atualizados localmente.'
-  closeDialog()
+  if (!payload.nomeCompleto || !payload.email) {
+    errorMessage.value = 'Nome completo e e-mail são obrigatórios.'
+    return
+  }
+
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    await persistUserEdit(selectedUser.value.id, payload)
+    feedbackMessage.value = `Dados de ${payload.nomeCompleto} atualizados com sucesso.`
+    closeDialog()
+    await loadUsers()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Erro ao salvar alterações do usuário'
+  } finally {
+    isLoading.value = false
+  }
 }
 
 async function confirmRoleChange() {
@@ -308,6 +364,10 @@ function openRoleChangeDialog(user: UserRow) {
 }
 
 onMounted(() => {
+  if (!canAccessAdminArea.value) {
+    return
+  }
+
   loadUsers()
 })
 </script>
