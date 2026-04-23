@@ -1,6 +1,6 @@
 <script setup lang="ts">
 defineProps<{
-  tone?: 'info' | 'danger'
+  tone?: 'info' | 'danger' | 'warning'
 }>()
 </script>
 
@@ -28,5 +28,11 @@ defineProps<{
   background: var(--danger-bg);
   border-color: var(--danger-border);
   color: var(--danger-text);
+}
+
+.ui-alert--warning {
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
 }
 </style>
