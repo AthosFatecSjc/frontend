@@ -31,9 +31,7 @@ type UserApiRow = {
 }
 
 type UserEditPayload = {
-  nomeCompleto: string
-  email: string
-  telefone: string | null
+  novoEmail: string
 }
 
 type FilterState = {
@@ -59,9 +57,7 @@ const roleChangeTargetRole = ref<UserRole>('ADMIN')
 const isSubmittingRoleChange = ref(false)
 
 const editForm = reactive({
-  nomeCompleto: '',
   email: '',
-  telefone: '',
 })
 
 const canAccessAdminArea = computed(() => hasAdminAccess())
@@ -164,9 +160,7 @@ function openDialog(type: DialogType, user: UserRow) {
   errorMessage.value = ''
 
   if (type === 'edit') {
-    editForm.nomeCompleto = user.nomeCompleto
     editForm.email = user.email
-    editForm.telefone = user.telefone === '-' ? '' : user.telefone
   }
 
   if (type === 'reject') {
@@ -186,10 +180,10 @@ function closeDialog() {
 
 async function persistUserEdit(userId: string, payload: UserEditPayload) {
   const candidateUrls = [
-    `${API_BASE_URL}/admin/usuarios/${userId}`,
-    `${API_BASE_URL}/admin/usuarios/${userId}/dados`,
+    `${API_BASE_URL}/admin/usuarios/${userId}/email`,
+    `${API_BASE_URL}/usuarios/${userId}/email`,
   ]
-  const candidateMethods: Array<'PATCH' | 'PUT'> = ['PATCH', 'PUT']
+  const candidateMethods: Array<'PATCH'> = ['PATCH']
   let lastError: Error | null = null
 
   for (const url of candidateUrls) {
@@ -295,13 +289,11 @@ async function confirmSaveEdit() {
   if (!selectedUser.value) return
 
   const payload: UserEditPayload = {
-    nomeCompleto: editForm.nomeCompleto.trim(),
-    email: editForm.email.trim(),
-    telefone: editForm.telefone.trim() || null,
+    novoEmail: editForm.email.trim(),
   }
 
-  if (!payload.nomeCompleto || !payload.email) {
-    errorMessage.value = 'Nome completo e e-mail são obrigatórios.'
+  if (!payload.novoEmail) {
+    errorMessage.value = 'E-mail é obrigatório.'
     return
   }
 
@@ -310,7 +302,7 @@ async function confirmSaveEdit() {
 
   try {
     await persistUserEdit(selectedUser.value.id, payload)
-    feedbackMessage.value = `Dados de ${payload.nomeCompleto} atualizados com sucesso.`
+    feedbackMessage.value = `E-mail de ${selectedUser.value.nomeCompleto} atualizado com sucesso.`
     closeDialog()
     await loadUsers()
   } catch (error) {
@@ -553,22 +545,14 @@ onMounted(() => {
       <div v-else-if="selectedDialog === 'edit' && selectedUser" class="modal-card">
         <button type="button" class="modal-close" aria-label="Fechar" @click="closeDialog">×</button>
         <p class="modal-eyebrow">Editar Usuário</p>
-        <h3 class="modal-title">Altere as informações do usuário abaixo.</h3>
+        <h3 class="modal-title">Altere o e-mail do usuário abaixo.</h3>
 
         <div class="modal-form">
-          <div class="modal-field">
-            <UiLabel for="edit-name">Nome completo</UiLabel>
-            <UiInput id="edit-name" v-model="editForm.nomeCompleto" />
-          </div>
           <div class="modal-field">
             <UiLabel for="edit-email">E-mail</UiLabel>
             <UiInput id="edit-email" v-model="editForm.email" />
           </div>
-          <div class="modal-field">
-            <UiLabel for="edit-phone">Telefone</UiLabel>
-            <UiInput id="edit-phone" v-model="editForm.telefone" />
-          </div>
-          <UiAlert tone="warning" class="modal-note">Nota: A data de cadastro não pode ser alterada.</UiAlert>
+          <UiAlert tone="warning" class="modal-note">Somente administradores podem alterar e-mail de usuários.</UiAlert>
         </div>
 
         <div class="modal-actions">

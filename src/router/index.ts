@@ -55,10 +55,6 @@ router.beforeEach((to) => {
   }
 
   if (!getAccessToken()) {
-    if (import.meta.env.DEV) {
-      return true
-    }
-
     return '/login'
   }
 
