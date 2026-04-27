@@ -13,6 +13,7 @@ const props = withDefaults(defineProps<{
 const route = useRoute()
 
 const items = [
+  { label: 'Mapa de Calor', to: '/dashboard', icon: 'map', match: ['/dashboard'] },
   { label: 'Minha Conta', to: '/minha-conta', icon: 'user', match: ['/minha-conta'] },
   { label: 'Gestão de Usuários', to: '/admin/usuarios', icon: 'users', match: ['/admin/usuarios'] },
   { label: 'Logs e Auditoria', to: '/admin/logs', icon: 'logs', match: ['/admin/logs'] },
@@ -21,7 +22,7 @@ const items = [
 const visibleItems = computed(() => items.map(item => ({
   ...item,
   isActive: item.match.some(path => route.path.startsWith(path)),
-})).filter((item) => item.to === '/minha-conta' || hasAdminAccess()))
+})).filter((item) => item.to === '/dashboard' || item.to === '/minha-conta' || hasAdminAccess()))
 </script>
 
 <template>
@@ -53,6 +54,24 @@ const visibleItems = computed(() => items.map(item => ({
               />
               <path
                 d="M14 3v6h6M11 13h6M11 17h6"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+            </template>
+            <template v-else-if="item.icon === 'map'">
+              <path
+                d="M3.25 6.5 8 4l8 2.5 4.75-2.5v13.5L16 20l-8-2.5-4.75 2.5Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+              <path
+                d="M8 4v13.5M16 6.5V20"
                 fill="none"
                 stroke="currentColor"
                 stroke-linecap="round"
