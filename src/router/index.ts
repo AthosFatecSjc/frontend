@@ -2,6 +2,8 @@ import { getAuthUser } from '@/services/authService'
 import { getPendingTerms } from '@/services/termsService'
 import { createRouter, createWebHistory } from 'vue-router'
 
+import { getAccessToken, hasAdminAccess } from '@/services/authService'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -49,6 +51,13 @@ const router = createRouter({
       path: '/admin/logs',
       name: 'AdminLogs',
       component: () => import('../pages/AdminLogs.vue'),
+      meta: { requiresAdmin: true },
+    },
+    {
+      path: '/admin/usuarios',
+      name: 'AdminUsuarios',
+      component: () => import('../pages/AdminUsuarios.vue'),
+      meta: { requiresAdmin: true },
     },
   ],
 })
@@ -71,6 +80,26 @@ router.beforeEach(async (to) => {
   } catch (error) {
     console.error('Error during route guard:', error)
     // In case of any error (e.g., network issues), allow navigation but log the error
+  }
+
+  return true
+})
+
+router.beforeEach((to) => {
+  if (!to.meta.requiresAdmin) {
+    return true
+  }
+
+  if (!getAccessToken()) {
+    if (import.meta.env.DEV) {
+      return true
+    }
+
+    return '/login'
+  }
+
+  if (!hasAdminAccess()) {
+    return '/dashboard'
   }
 
   return true

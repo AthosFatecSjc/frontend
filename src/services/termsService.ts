@@ -94,5 +94,6 @@ function storeSessaoAutenticada(payload: LoginResponse) {
     userId: payload.userId,
     email: payload.email,
     nome: payload.nome,
+    role: payload.role ?? null,
   }))
 }

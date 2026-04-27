@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
+import { hasAdminAccess } from '@/services/authService'
+
 const props = withDefaults(defineProps<{
   collapsed?: boolean
 }>(), {
@@ -12,13 +14,14 @@ const route = useRoute()
 
 const items = [
   { label: 'Minha Conta', to: '/minha-conta', icon: 'user', match: ['/minha-conta'] },
+  { label: 'Gestão de Usuários', to: '/admin/usuarios', icon: 'users', match: ['/admin/usuarios'] },
   { label: 'Logs e Auditoria', to: '/admin/logs', icon: 'logs', match: ['/admin/logs'] },
 ]
 
 const visibleItems = computed(() => items.map(item => ({
   ...item,
   isActive: item.match.some(path => route.path.startsWith(path)),
-})))
+})).filter((item) => item.to === '/minha-conta' || hasAdminAccess()))
 </script>
 
 <template>
@@ -50,6 +53,24 @@ const visibleItems = computed(() => items.map(item => ({
               />
               <path
                 d="M14 3v6h6M11 13h6M11 17h6"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+            </template>
+            <template v-else-if="item.icon === 'users'">
+              <path
+                d="M9.5 12.25a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.25 0a2.75 2.75 0 1 0-2.75-2.75 2.75 2.75 0 0 0 2.75 2.75ZM4.5 19.5a5 5 0 0 1 10 0"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+              <path
+                d="M14.75 19.5a4.25 4.25 0 0 0-8.5 0"
                 fill="none"
                 stroke="currentColor"
                 stroke-linecap="round"
