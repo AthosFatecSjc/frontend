@@ -6,10 +6,10 @@ export interface ConsentimentoDocumento {
   required: boolean
 }
 
-export interface ConsentimentosVigentesResponse {
-  terms: ConsentimentoDocumento
-  privacy: ConsentimentoDocumento
-  marketing: ConsentimentoDocumento
+export type ConsentimentosVigentesResponse = {
+  terms: ConsentimentoDocumento[]
+  privacy: ConsentimentoDocumento[]
+  marketing: ConsentimentoDocumento[]
 }
 
 export interface UsuarioCadastroRequest {

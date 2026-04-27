@@ -1,6 +1,5 @@
 import type { BackendAuthError, LoginResponse, LoginResult } from '../types/auth'
 import { API_BASE_URL } from './api'
-import { storePendingTermsContext } from './termsService'
 
 const ACCESS_TOKEN_STORAGE_KEY = 'accessToken'
 const AUTH_USER_STORAGE_KEY = 'authUser'
@@ -145,19 +144,6 @@ export async function loginWithStorage(email: string, senha: string): Promise<Lo
       return {
         type: 'invalid',
         message: 'Seu cadastro nao esta com status ativo. Entre em contato com o administrador.',
-      }
-    }
-
-    if (status === 403 && code === 'TERMS_REVIEW_REQUIRED' && details?.pendingTerms?.length) {
-      storePendingTermsContext({
-        email,
-        pendingTerms: details.pendingTerms,
-      })
-
-      return {
-        type: 'pending',
-        message: 'Ha termos vigentes pendentes. Revise-os antes de entrar na plataforma.',
-        nextRoute: '/consentimentos-pendentes',
       }
     }
 

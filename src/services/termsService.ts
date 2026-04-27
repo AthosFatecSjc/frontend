@@ -1,40 +1,16 @@
 import type { ConsentimentosVigentesResponse } from '../types/cadastro'
-import type { LoginResponse, PendingTerm } from '../types/auth'
+import type { LoginResponse,  } from '../types/auth'
 import { API_BASE_URL } from './api'
+import { getAuthUser } from './authService'
+import type { Terms } from '@/types/terms'
 
-const PENDING_TERMS_CONTEXT_KEY = 'pendingTermsContext'
 const ACCESS_TOKEN_STORAGE_KEY = 'accessToken'
 const AUTH_USER_STORAGE_KEY = 'authUser'
 
-export type PendingTermsContext = {
-  email: string
-  pendingTerms: PendingTerm[]
-}
-
 type ResolvePendingTermsPayload = {
-  email: string
   senha: string
   requiredTermsIds: string[]
   optionalAcceptedTermsIds: string[]
-}
-
-export function storePendingTermsContext(context: PendingTermsContext) {
-  sessionStorage.setItem(PENDING_TERMS_CONTEXT_KEY, JSON.stringify(context))
-}
-
-export function getPendingTermsContext(): PendingTermsContext | null {
-  const raw = sessionStorage.getItem(PENDING_TERMS_CONTEXT_KEY)
-  if (!raw) return null
-
-  try {
-    return JSON.parse(raw) as PendingTermsContext
-  } catch {
-    return null
-  }
-}
-
-export function clearPendingTermsContext() {
-  sessionStorage.removeItem(PENDING_TERMS_CONTEXT_KEY)
 }
 
 export async function buscarDocumentosVigentes(): Promise<ConsentimentosVigentesResponse> {
@@ -47,9 +23,29 @@ export async function buscarDocumentosVigentes(): Promise<ConsentimentosVigentes
   return response.json() as Promise<ConsentimentosVigentesResponse>
 }
 
+export async function getPendingTerms(): Promise<Terms[]> {
+  const authUser = getAuthUser()
+
+  if (!authUser) {
+    throw new Error('Usuario nao autenticado.')
+  }
+
+  const response = await fetch(`${API_BASE_URL}/users/${authUser.userId}/terms/pending`);
+
+  if (!response.ok) {
+    throw new Error('Nao foi possivel verificar os termos pendentes.')
+  }
+
+  return await response.json()
+}
+
 export async function resolverPendenciasDeTermos(
   payload: ResolvePendingTermsPayload,
 ): Promise<LoginResponse> {
+  const authUser = getAuthUser()
+
+  if (!authUser || !authUser.email) throw new Error('Usuario nao autenticado.')
+
   clearSessaoAutenticada()
 
   const response = await fetch(`${API_BASE_URL}/auth/terms/pending/resolve`, {
@@ -57,7 +53,10 @@ export async function resolverPendenciasDeTermos(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      ...payload,
+      email: authUser.email
+    }),
   })
 
   if (!response.ok) {
@@ -81,7 +80,6 @@ export async function resolverPendenciasDeTermos(
 
   const auth = await response.json() as LoginResponse
   storeSessaoAutenticada(auth)
-  clearPendingTermsContext()
   return auth
 }
 

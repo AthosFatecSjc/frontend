@@ -2,13 +2,6 @@ export type UserStatus = 'ATIVO' | 'PENDENTE' | 'REJEITADO'
 
 export type LoginResultType = 'success' | 'pending' | 'rejected' | 'invalid'
 
-export interface PendingTerm {
-  termId: string
-  type: string
-  version: number
-  required: boolean
-}
-
 export interface LoginRequest {
   email: string
   senha: string
@@ -31,7 +24,6 @@ export interface BackendAuthError {
   reason: string | null
   details?: {
     redirect?: string
-    pendingTerms?: PendingTerm[]
   } | null
 }
 
