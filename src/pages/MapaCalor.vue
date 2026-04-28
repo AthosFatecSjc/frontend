@@ -1,168 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import HeatmapGeoMap from '@/components/mapa/HeatmapGeoMap.vue'
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout.vue'
+import { conjuntosMock, criticidadeMeta, legendItems } from '@/services/mapaService'
+import type { Conjunto, FiltrosMapa } from '@/types/mapa'
 
-type Criticidade = 'baixo' | 'moderado' | 'alto' | 'ausente'
+const mapRef = ref<InstanceType<typeof HeatmapGeoMap> | null>(null)
 
-type Indicador = {
-  id: string
-  label: string
-  valor: number
-  limite: number
-  unidade?: string
-}
-
-type Conjunto = {
-  id: string
-  nome: string
-  distribuidora: string
-  estado: string
-  subestacao: string
-  criticidade: Criticidade
-  indicadorPrincipal: Indicador
-  indicadoresPrincipais: Indicador[]
-  complementares: Indicador[]
-  periodoReferencia: string
-  path: string
-}
-
-type Filters = {
-  ano: string
-  distribuidora: string
-  estado: string
-  conjunto: string
-  subestacao: string
-}
-
-const BASE_SHAPE =
-  'M90 90 L170 50 L270 60 L350 40 L460 80 L560 70 L640 150 L660 230 L630 320 L580 390 L470 430 L350 440 L250 420 L170 390 L120 320 L80 230 Z'
-
-const municipios = [
-  { id: 'm1', d: 'M140 150 L200 120 L250 150 L230 190 L160 180 Z' },
-  { id: 'm2', d: 'M250 150 L320 120 L370 150 L350 200 L270 190 Z' },
-  { id: 'm3', d: 'M370 150 L450 130 L500 160 L470 210 L390 200 Z' },
-  { id: 'm4', d: 'M500 160 L570 140 L610 190 L580 230 L510 210 Z' },
-  { id: 'm5', d: 'M130 200 L210 190 L250 230 L210 270 L150 260 Z' },
-  { id: 'm6', d: 'M250 230 L330 200 L380 240 L350 290 L270 280 Z' },
-  { id: 'm7', d: 'M380 240 L470 210 L520 260 L490 310 L400 300 Z' },
-  { id: 'm8', d: 'M520 260 L600 230 L630 280 L600 330 L520 310 Z' },
-  { id: 'm9', d: 'M150 280 L230 270 L260 310 L220 350 L160 340 Z' },
-  { id: 'm10', d: 'M260 310 L340 290 L380 330 L350 370 L270 360 Z' },
-  { id: 'm11', d: 'M380 330 L470 310 L520 350 L490 390 L400 380 Z' },
-  { id: 'm12', d: 'M520 350 L590 330 L610 370 L580 400 L520 390 Z' },
-]
-
-const conjuntos = ref<Conjunto[]>([
-  {
-    id: 'encantado',
-    nome: 'Encantado',
-    distribuidora: 'RGE Sul',
-    estado: 'RS',
-    subestacao: 'Caxias 1',
-    criticidade: 'alto',
-    indicadorPrincipal: { id: 'dec', label: 'DEC', valor: 7.68, limite: 6.5 },
-    indicadoresPrincipais: [
-      { id: 'dec', label: 'DEC', valor: 7.68, limite: 6.5 },
-      { id: 'fec', label: 'FEC', valor: 3.68, limite: 3.2 },
-    ],
-    complementares: [
-      { id: 'perdas-tecnicas', label: 'Perdas tecnicas', valor: 3.79, limite: 3.03 },
-      { id: 'perdas-nao-tecnicas', label: 'Perdas nao tecnicas', valor: 1.76, limite: 1.5 },
-    ],
-    periodoReferencia: '12/2022',
-    path: 'M170 210 L270 190 L350 230 L330 310 L230 340 L170 280 Z',
-  },
-  {
-    id: 'gramado',
-    nome: 'Gramado',
-    distribuidora: 'RGE Sul',
-    estado: 'RS',
-    subestacao: 'Gramado 2',
-    criticidade: 'moderado',
-    indicadorPrincipal: { id: 'dec', label: 'DEC', valor: 4.12, limite: 6.5 },
-    indicadoresPrincipais: [
-      { id: 'dec', label: 'DEC', valor: 4.12, limite: 6.5 },
-      { id: 'fec', label: 'FEC', valor: 2.85, limite: 3.2 },
-    ],
-    complementares: [
-      { id: 'perdas-tecnicas', label: 'Perdas tecnicas', valor: 2.4, limite: 3.03 },
-      { id: 'perdas-nao-tecnicas', label: 'Perdas nao tecnicas', valor: 0.92, limite: 1.5 },
-    ],
-    periodoReferencia: '12/2022',
-    path: 'M360 150 L500 150 L590 220 L520 300 L400 280 L350 210 Z',
-  },
-  {
-    id: 'torres',
-    nome: 'Torres',
-    distribuidora: 'RGE Sul',
-    estado: 'RS',
-    subestacao: 'Torres 1',
-    criticidade: 'baixo',
-    indicadorPrincipal: { id: 'dec', label: 'DEC', valor: 2.18, limite: 6.5 },
-    indicadoresPrincipais: [
-      { id: 'dec', label: 'DEC', valor: 2.18, limite: 6.5 },
-      { id: 'fec', label: 'FEC', valor: 1.42, limite: 3.2 },
-    ],
-    complementares: [
-      { id: 'perdas-tecnicas', label: 'Perdas tecnicas', valor: 1.8, limite: 3.03 },
-      { id: 'perdas-nao-tecnicas', label: 'Perdas nao tecnicas', valor: 0.74, limite: 1.5 },
-    ],
-    periodoReferencia: '12/2022',
-    path: 'M400 300 L520 290 L600 340 L570 400 L450 410 L380 350 Z',
-  },
-  {
-    id: 'caxias',
-    nome: 'Caxias do Sul',
-    distribuidora: 'RGE Sul',
-    estado: 'RS',
-    subestacao: 'Caxias 2',
-    criticidade: 'ausente',
-    indicadorPrincipal: { id: 'dec', label: 'DEC', valor: 0, limite: 0 },
-    indicadoresPrincipais: [
-      { id: 'dec', label: 'DEC', valor: 0, limite: 0 },
-      { id: 'fec', label: 'FEC', valor: 0, limite: 0 },
-    ],
-    complementares: [
-      { id: 'perdas-tecnicas', label: 'Perdas tecnicas', valor: 0, limite: 0 },
-      { id: 'perdas-nao-tecnicas', label: 'Perdas nao tecnicas', valor: 0, limite: 0 },
-    ],
-    periodoReferencia: '12/2022',
-    path: 'M130 140 L230 110 L310 140 L270 200 L170 210 L120 170 Z',
-  },
-])
-
-const criticidadeMeta: Record<Criticidade, { label: string; descricao: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }> = {
-  baixo: {
-    label: 'Dentro do limite',
-    descricao: 'Abaixo de 50% do limite',
-    tone: 'success',
-  },
-  moderado: {
-    label: 'Zona de atencao',
-    descricao: 'Entre 50% e 100% do limite',
-    tone: 'warning',
-  },
-  alto: {
-    label: 'Acima do limite',
-    descricao: 'Acima de 100% do limite',
-    tone: 'danger',
-  },
-  ausente: {
-    label: 'Indicador ausente',
-    descricao: 'Indicador indisponivel no recorte',
-    tone: 'neutral',
-  },
-}
-
-const legendItems = [
-  { status: 'baixo', title: 'Verde', descricao: 'Abaixo de 50% do limite' },
-  { status: 'moderado', title: 'Amarelo', descricao: 'Entre 50% e 100% do limite' },
-  { status: 'alto', title: 'Vermelho', descricao: 'Acima de 100% do limite' },
-  { status: 'ausente', title: 'Ausente', descricao: 'Indicador indisponivel' },
-] as const
-
-const initialFilters: Filters = {
+const initialFilters: FiltrosMapa = {
   ano: '2022',
   distribuidora: 'RGE Sul',
   estado: 'RS',
@@ -170,11 +16,10 @@ const initialFilters: Filters = {
   subestacao: 'todas',
 }
 
-const draftFilters = ref<Filters>({ ...initialFilters })
-const activeFilters = ref<Filters>({ ...initialFilters })
-
+const draftFilters = ref<FiltrosMapa>({ ...initialFilters })
+const activeFilters = ref<FiltrosMapa>({ ...initialFilters })
+const conjuntos = ref<Conjunto[]>(conjuntosMock)
 const selectedConjuntoId = ref(conjuntos.value[0]?.id ?? '')
-const mapZoom = ref(1)
 
 const anoOptions = ['2022', '2023', '2024']
 
@@ -216,8 +61,6 @@ const selectedConjunto = computed(() => {
   return filteredConjuntos.value.find((item) => item.id === selectedConjuntoId.value) ?? filteredConjuntos.value[0]
 })
 
-const mapScale = computed(() => `scale(${mapZoom.value})`)
-
 function ensureSelected() {
   const matches = filteredConjuntos.value
 
@@ -227,7 +70,7 @@ function ensureSelected() {
   }
 
   if (!matches.some((item) => item.id === selectedConjuntoId.value)) {
-    selectedConjuntoId.value = matches[0].id
+    selectedConjuntoId.value = matches[0]!.id
   }
 }
 
@@ -240,23 +83,15 @@ function clearFilters() {
   draftFilters.value = { ...initialFilters }
   activeFilters.value = { ...initialFilters }
   selectedConjuntoId.value = conjuntos.value[0]?.id ?? ''
+  mapRef.value?.resetView()
 }
 
 function selectConjunto(conjuntoId: string) {
   selectedConjuntoId.value = conjuntoId
 }
 
-function zoomIn() {
-  mapZoom.value = Math.min(1.35, Number((mapZoom.value + 0.1).toFixed(2)))
-}
-
-function zoomOut() {
-  mapZoom.value = Math.max(0.85, Number((mapZoom.value - 0.1).toFixed(2)))
-}
-
 function resetMapView() {
-  mapZoom.value = 1
-  ensureSelected()
+  mapRef.value?.resetView()
 }
 
 function formatNumber(value: number) {
@@ -339,7 +174,7 @@ function formatPercent(value: number, limit: number) {
             <p class="map-card__eyebrow">Leitura geoespacial</p>
             <h2 class="map-card__title">Mapa operacional da rede com criticidade por conjunto eletrico</h2>
             <p class="map-card__subtitle">
-              Selecione um conjunto eletrico para analisar a distribuicao de criticidade e a situacao dos indicadores.
+              Navegue com zoom e arraste. Clique nos recortes para analisar criticidade e indicadores.
             </p>
           </div>
           <div class="map-card__actions">
@@ -351,46 +186,12 @@ function formatPercent(value: number, limit: number) {
 
         <div class="map-wrapper">
           <div class="map-canvas">
-            <svg class="map-svg" viewBox="0 0 720 480" role="img" aria-label="Mapa de criticidade">
-              <title>Mapa de criticidade</title>
-              <defs>
-                <clipPath id="mapClip">
-                  <path :d="BASE_SHAPE" />
-                </clipPath>
-              </defs>
-
-              <g class="map-zoom-layer" :style="{ transform: mapScale }" :clip-path="'url(#mapClip)'">
-                <path :d="BASE_SHAPE" class="map-layer map-layer--base" />
-
-                <g class="map-layer map-layer--municipios">
-                  <path
-                    v-for="municipio in municipios"
-                    :key="municipio.id"
-                    :d="municipio.d"
-                    class="map-municipio"
-                  />
-                </g>
-
-                <g class="map-layer map-layer--conjuntos">
-                  <path
-                    v-for="conjunto in filteredConjuntos"
-                    :key="conjunto.id"
-                    :d="conjunto.path"
-                    class="map-conjunto"
-                    :class="[
-                      `map-conjunto--${conjunto.criticidade}`,
-                      { 'map-conjunto--active': conjunto.id === selectedConjuntoId },
-                    ]"
-                    @click="selectConjunto(conjunto.id)"
-                  />
-                </g>
-              </g>
-            </svg>
-
-            <div class="map-controls">
-              <button type="button" class="map-control" aria-label="Aproximar" @click="zoomIn">+</button>
-              <button type="button" class="map-control" aria-label="Afastar" @click="zoomOut">-</button>
-            </div>
+            <HeatmapGeoMap
+              ref="mapRef"
+              :conjuntos="filteredConjuntos"
+              :selected-conjunto-id="selectedConjuntoId"
+              @select="selectConjunto"
+            />
 
             <div v-if="selectedConjunto" class="map-pill">
               <span class="map-pill__label">Recorte ativo</span>
@@ -654,110 +455,22 @@ function formatPercent(value: number, limit: number) {
 
 .map-canvas {
   position: relative;
-  height: 420px;
+  height: 460px;
   border-radius: 20px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(14, 165, 233, 0.08), transparent 35%),
-    radial-gradient(circle at 80% 30%, rgba(59, 130, 246, 0.08), transparent 35%),
-    linear-gradient(180deg, #f8fbff 0%, #eef5fc 100%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+  background: linear-gradient(180deg, #f8fbff 0%, #eef5fc 100%);
 }
 
-.map-canvas::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    repeating-linear-gradient(0deg, rgba(148, 163, 184, 0.08) 0, rgba(148, 163, 184, 0.08) 1px, transparent 1px, transparent 32px),
-    repeating-linear-gradient(90deg, rgba(148, 163, 184, 0.08) 0, rgba(148, 163, 184, 0.08) 1px, transparent 1px, transparent 32px);
-  pointer-events: none;
+:deep(.leaflet-control-attribution) {
+  font-size: 0.65rem;
 }
 
-.map-svg {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  z-index: 1;
-}
-
-.map-zoom-layer {
-  transform-origin: 50% 50%;
-  transform-box: fill-box;
-  transition: transform 0.25s ease;
-}
-
-.map-layer--base {
-  fill: rgba(239, 202, 193, 0.7);
-  stroke: rgba(179, 83, 73, 0.7);
-  stroke-width: 2;
-}
-
-.map-municipio {
-  fill: none;
-  stroke: rgba(168, 113, 99, 0.75);
-  stroke-width: 1;
-}
-
-.map-conjunto {
-  fill-opacity: 0.55;
-  stroke-width: 2;
-  cursor: pointer;
-  transition: filter 0.2s ease, stroke-width 0.2s ease;
-}
-
-.map-conjunto--baixo {
-  fill: rgba(34, 197, 94, 0.35);
-  stroke: #16a34a;
-}
-
-.map-conjunto--moderado {
-  fill: rgba(234, 179, 8, 0.35);
-  stroke: #ca8a04;
-}
-
-.map-conjunto--alto {
-  fill: rgba(239, 68, 68, 0.35);
-  stroke: #dc2626;
-}
-
-.map-conjunto--ausente {
-  fill: rgba(148, 163, 184, 0.35);
-  stroke: #94a3b8;
-}
-
-.map-conjunto--active {
-  stroke-width: 3.4;
-  filter: drop-shadow(0 4px 12px rgba(15, 23, 42, 0.18));
-}
-
-.map-controls {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  display: grid;
-  gap: 8px;
-  z-index: 2;
-}
-
-.map-control {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  border: 1px solid #dbe3ec;
-  background: #ffffff;
-  color: #1f2937;
-  font-size: 1.1rem;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.map-control:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 20px rgba(15, 23, 42, 0.16);
+:deep(.leaflet-tooltip) {
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+  color: #0f172a;
+  font-weight: 600;
 }
 
 .map-pill {
@@ -771,7 +484,7 @@ function formatPercent(value: number, limit: number) {
   color: #f8fafc;
   border-radius: 12px;
   font-size: 0.8rem;
-  z-index: 2;
+  z-index: 650;
 }
 
 .map-pill__label {
@@ -790,7 +503,7 @@ function formatPercent(value: number, limit: number) {
   padding: 2rem;
   color: #64748b;
   font-size: 0.9rem;
-  z-index: 3;
+  z-index: 700;
   background: rgba(248, 250, 252, 0.92);
 }
 
