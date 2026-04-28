@@ -2,12 +2,12 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import * as L from 'leaflet'
 
-import { municipiosMock } from '@/services/mapaService'
 import type { Conjunto, Criticidade } from '@/types/mapa'
 
 const props = defineProps<{
   conjuntos: Conjunto[]
   selectedConjuntoId: string
+  municipiosGeoJson?: GeoJSON.FeatureCollection<GeoJSON.Geometry> | null
 }>()
 
 const emit = defineEmits<{
@@ -37,7 +37,7 @@ function styleByCriticidade(criticidade: Criticidade, isSelected: boolean): L.Pa
   }
 }
 
-function buildConjuntosFeatureCollection(items: Conjunto[]): GeoJSON.FeatureCollection<GeoJSON.Polygon> {
+function buildConjuntosFeatureCollection(items: Conjunto[]): GeoJSON.FeatureCollection<GeoJSON.Geometry> {
   return {
     type: 'FeatureCollection',
     features: items.map((item) => ({
@@ -57,9 +57,14 @@ function renderMunicipios() {
 
   if (municipioLayer) {
     municipioLayer.remove()
+    municipioLayer = null
   }
 
-  municipioLayer = L.geoJSON(municipiosMock, {
+  if (!props.municipiosGeoJson || props.municipiosGeoJson.features.length === 0) {
+    return
+  }
+
+  municipioLayer = L.geoJSON(props.municipiosGeoJson, {
     style: {
       color: '#b45349',
       weight: 1,
@@ -71,11 +76,21 @@ function renderMunicipios() {
 }
 
 function fitToCurrentConjuntos() {
-  if (!map || !conjuntosLayer) return
+  if (!map) return
 
-  const bounds = conjuntosLayer.getBounds()
-  if (bounds.isValid()) {
-    map.fitBounds(bounds.pad(0.15))
+  if (conjuntosLayer) {
+    const conjuntoBounds = conjuntosLayer.getBounds()
+    if (conjuntoBounds.isValid()) {
+      map.fitBounds(conjuntoBounds.pad(0.15))
+      return
+    }
+  }
+
+  if (municipioLayer) {
+    const municipioBounds = municipioLayer.getBounds()
+    if (municipioBounds.isValid()) {
+      map.fitBounds(municipioBounds.pad(0.08))
+    }
   }
 }
 
@@ -84,9 +99,15 @@ function renderConjuntos(fitBounds = false) {
 
   if (conjuntosLayer) {
     conjuntosLayer.remove()
+    conjuntosLayer = null
   }
 
-  if (!props.conjuntos.length) return
+  if (!props.conjuntos.length) {
+    if (fitBounds) {
+      fitToCurrentConjuntos()
+    }
+    return
+  }
 
   const geojson = buildConjuntosFeatureCollection(props.conjuntos)
 
@@ -166,6 +187,15 @@ watch(
   () => {
     renderConjuntos(false)
   },
+)
+
+watch(
+  () => props.municipiosGeoJson,
+  () => {
+    renderMunicipios()
+    fitToCurrentConjuntos()
+  },
+  { deep: true },
 )
 
 onUnmounted(() => {

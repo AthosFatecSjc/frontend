@@ -1,167 +1,143 @@
-import type { Conjunto, CriticidadeMeta } from '@/types/mapa'
+import { API_BASE_URL, createProtectedJsonRequest, parseApiResponse } from './api'
+import type { Conjunto, Criticidade, CriticidadeMeta, MapaCalorApiResponse } from '@/types/mapa'
 
-const toPolygon = (coords: [number, number][]) => ({
-  type: 'Polygon',
-  coordinates: [[...coords, coords[0]]],
-}) as GeoJSON.Polygon
+type MapaCalorServiceResponse = {
+  conjuntos: Conjunto[]
+  anosDisponiveis: string[]
+}
 
-export const conjuntosMock: Conjunto[] = [
-  {
-    id: 'encantado',
-    nome: 'Encantado',
-    distribuidora: 'RGE Sul',
-    estado: 'RS',
-    subestacao: 'Caxias 1',
-    criticidade: 'alto',
-    indicadorPrincipal: { id: 'dec', label: 'DEC', valor: 7.68, limite: 6.5 },
-    indicadoresPrincipais: [
-      { id: 'dec', label: 'DEC', valor: 7.68, limite: 6.5 },
-      { id: 'fec', label: 'FEC', valor: 3.68, limite: 3.2 },
-    ],
-    complementares: [
-      { id: 'perdas-tecnicas', label: 'Perdas tecnicas', valor: 3.79, limite: 3.03 },
-      { id: 'perdas-nao-tecnicas', label: 'Perdas nao tecnicas', valor: 1.76, limite: 1.5 },
-    ],
-    periodoReferencia: '12/2022',
-    geometry: toPolygon([
-      [-51.95, -29.65],
-      [-51.72, -29.63],
-      [-51.66, -29.81],
-      [-51.86, -29.92],
-      [-52.02, -29.79],
-    ]),
-  },
-  {
-    id: 'gramado',
-    nome: 'Gramado',
-    distribuidora: 'RGE Sul',
-    estado: 'RS',
-    subestacao: 'Gramado 2',
-    criticidade: 'moderado',
-    indicadorPrincipal: { id: 'dec', label: 'DEC', valor: 4.12, limite: 6.5 },
-    indicadoresPrincipais: [
-      { id: 'dec', label: 'DEC', valor: 4.12, limite: 6.5 },
-      { id: 'fec', label: 'FEC', valor: 2.85, limite: 3.2 },
-    ],
-    complementares: [
-      { id: 'perdas-tecnicas', label: 'Perdas tecnicas', valor: 2.4, limite: 3.03 },
-      { id: 'perdas-nao-tecnicas', label: 'Perdas nao tecnicas', valor: 0.92, limite: 1.5 },
-    ],
-    periodoReferencia: '12/2022',
-    geometry: toPolygon([
-      [-50.98, -29.26],
-      [-50.73, -29.27],
-      [-50.68, -29.43],
-      [-50.89, -29.5],
-      [-51.05, -29.42],
-    ]),
-  },
-  {
-    id: 'torres',
-    nome: 'Torres',
-    distribuidora: 'RGE Sul',
-    estado: 'RS',
-    subestacao: 'Torres 1',
-    criticidade: 'baixo',
-    indicadorPrincipal: { id: 'dec', label: 'DEC', valor: 2.18, limite: 6.5 },
-    indicadoresPrincipais: [
-      { id: 'dec', label: 'DEC', valor: 2.18, limite: 6.5 },
-      { id: 'fec', label: 'FEC', valor: 1.42, limite: 3.2 },
-    ],
-    complementares: [
-      { id: 'perdas-tecnicas', label: 'Perdas tecnicas', valor: 1.8, limite: 3.03 },
-      { id: 'perdas-nao-tecnicas', label: 'Perdas nao tecnicas', valor: 0.74, limite: 1.5 },
-    ],
-    periodoReferencia: '12/2022',
-    geometry: toPolygon([
-      [-49.95, -29.22],
-      [-49.67, -29.2],
-      [-49.64, -29.39],
-      [-49.87, -29.45],
-      [-50.01, -29.36],
-    ]),
-  },
-  {
-    id: 'caxias',
-    nome: 'Caxias do Sul',
-    distribuidora: 'RGE Sul',
-    estado: 'RS',
-    subestacao: 'Caxias 2',
-    criticidade: 'ausente',
-    indicadorPrincipal: { id: 'dec', label: 'DEC', valor: 0, limite: 0 },
-    indicadoresPrincipais: [
-      { id: 'dec', label: 'DEC', valor: 0, limite: 0 },
-      { id: 'fec', label: 'FEC', valor: 0, limite: 0 },
-    ],
-    complementares: [
-      { id: 'perdas-tecnicas', label: 'Perdas tecnicas', valor: 0, limite: 0 },
-      { id: 'perdas-nao-tecnicas', label: 'Perdas nao tecnicas', valor: 0, limite: 0 },
-    ],
-    periodoReferencia: '12/2022',
-    geometry: toPolygon([
-      [-51.37, -29.07],
-      [-51.05, -29.03],
-      [-51.01, -29.25],
-      [-51.29, -29.34],
-      [-51.45, -29.2],
-    ]),
-  },
-]
-
-export const municipiosMock: GeoJSON.FeatureCollection<GeoJSON.Geometry> = {
+const EMPTY_GEOJSON: GeoJSON.FeatureCollection<GeoJSON.Geometry> = {
   type: 'FeatureCollection',
-  features: [
-    {
-      type: 'Feature',
-      properties: { nome: 'Municipio A' },
-      geometry: toPolygon([
-        [-52.1, -29.95],
-        [-51.78, -29.9],
-        [-51.76, -29.7],
-        [-52.05, -29.65],
-      ]),
-    },
-    {
-      type: 'Feature',
-      properties: { nome: 'Municipio B' },
-      geometry: toPolygon([
-        [-51.76, -29.9],
-        [-51.42, -29.87],
-        [-51.35, -29.68],
-        [-51.66, -29.6],
-      ]),
-    },
-    {
-      type: 'Feature',
-      properties: { nome: 'Municipio C' },
-      geometry: toPolygon([
-        [-51.42, -29.87],
-        [-51.03, -29.83],
-        [-50.95, -29.6],
-        [-51.35, -29.68],
-      ]),
-    },
-    {
-      type: 'Feature',
-      properties: { nome: 'Municipio D' },
-      geometry: toPolygon([
-        [-51.03, -29.83],
-        [-50.62, -29.78],
-        [-50.56, -29.56],
-        [-50.95, -29.6],
-      ]),
-    },
-    {
-      type: 'Feature',
-      properties: { nome: 'Municipio E' },
-      geometry: toPolygon([
-        [-50.62, -29.78],
-        [-50.29, -29.74],
-        [-50.24, -29.5],
-        [-50.56, -29.56],
-      ]),
-    },
-  ],
+  features: [],
+}
+
+type RawIndicador = {
+  id?: string
+  label?: string
+  valor?: number | null
+  limite?: number | null
+}
+
+type RawConjunto = Omit<Conjunto, 'criticidade' | 'geometry' | 'indicadorPrincipal' | 'indicadoresPrincipais' | 'complementares'> & {
+  criticidade: string
+  geometry: GeoJSON.Geometry | null
+  indicadorPrincipal: RawIndicador | null
+  indicadoresPrincipais: RawIndicador[]
+  complementares: RawIndicador[]
+}
+
+function toNumber(value: number | null | undefined): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 0
+  }
+
+  return value
+}
+
+function normalizeCriticidade(value: string): Criticidade {
+  if (value === 'baixo' || value === 'moderado' || value === 'alto' || value === 'ausente') {
+    return value
+  }
+
+  return 'ausente'
+}
+
+function toIndicador(raw: RawIndicador | null | undefined, fallback: { id: string, label: string }) {
+  return {
+    id: raw?.id ?? fallback.id,
+    label: raw?.label ?? fallback.label,
+    valor: toNumber(raw?.valor),
+    limite: toNumber(raw?.limite),
+  }
+}
+
+function normalizeConjunto(raw: RawConjunto): Conjunto | null {
+  if (!raw.geometry) {
+    return null
+  }
+
+  return {
+    id: String(raw.id ?? ''),
+    nome: raw.nome ?? 'Conjunto sem nome',
+    distribuidora: raw.distribuidora ?? 'Distribuidora nao informada',
+    estado: (raw.estado ?? 'N/A').toUpperCase(),
+    subestacao: raw.subestacao ?? 'Nao informado',
+    criticidade: normalizeCriticidade(raw.criticidade),
+    indicadorPrincipal: toIndicador(raw.indicadorPrincipal, { id: 'dec', label: 'DEC' }),
+    indicadoresPrincipais: (raw.indicadoresPrincipais ?? []).map((item, index) =>
+      toIndicador(item, { id: `principal-${index}`, label: `Indicador ${index + 1}` }),
+    ),
+    complementares: (raw.complementares ?? []).map((item, index) =>
+      toIndicador(item, { id: `complementar-${index}`, label: `Complementar ${index + 1}` }),
+    ),
+    periodoReferencia: raw.periodoReferencia ?? 'Sem referencia',
+    geometry: raw.geometry,
+  }
+}
+
+export async function fetchMapaCalorData(ano?: string): Promise<MapaCalorServiceResponse> {
+  const params = new URLSearchParams()
+  if (ano) {
+    params.set('ano', ano)
+  }
+
+  const query = params.toString()
+  const response = await fetch(`${API_BASE_URL}/indicadores/mapa-calor${query ? `?${query}` : ''}`, createProtectedJsonRequest())
+
+  const payload = await parseApiResponse<MapaCalorApiResponse>(
+    response,
+    'Nao foi possivel carregar os dados do mapa de calor.',
+  )
+
+  const conjuntos = (payload.conjuntos as RawConjunto[])
+    .map(normalizeConjunto)
+    .filter((item): item is Conjunto => item !== null)
+
+  const anosDisponiveis = (payload.anosDisponiveis ?? []).map((item) => String(item))
+
+  return {
+    conjuntos,
+    anosDisponiveis,
+  }
+}
+
+async function fetchMunicipiosByUf(uf: string): Promise<GeoJSON.FeatureCollection<GeoJSON.Geometry>> {
+  const url = new URL('https://geoservicos.ibge.gov.br/geoserver/ows')
+  url.searchParams.set('service', 'WFS')
+  url.searchParams.set('version', '1.0.0')
+  url.searchParams.set('request', 'GetFeature')
+  url.searchParams.set('typeName', 'CGEO:municipio_2022')
+  url.searchParams.set('outputFormat', 'application/json')
+  url.searchParams.set('CQL_FILTER', `sigla_uf='${uf}'`)
+
+  const response = await fetch(url.toString())
+  if (!response.ok) {
+    throw new Error(`Falha ao carregar municipios para ${uf}.`)
+  }
+
+  return response.json() as Promise<GeoJSON.FeatureCollection<GeoJSON.Geometry>>
+}
+
+export async function fetchMunicipiosLayer(ufs: string[]): Promise<GeoJSON.FeatureCollection<GeoJSON.Geometry>> {
+  const uniqueUfs = Array.from(new Set(ufs.map((item) => item.trim().toUpperCase()).filter((item) => item.length === 2)))
+
+  if (!uniqueUfs.length) {
+    return EMPTY_GEOJSON
+  }
+
+  const results = await Promise.allSettled(uniqueUfs.map((uf) => fetchMunicipiosByUf(uf)))
+
+  const features: GeoJSON.Feature<GeoJSON.Geometry>[] = []
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      features.push(...(result.value.features ?? []))
+    }
+  }
+
+  return {
+    type: 'FeatureCollection',
+    features,
+  }
 }
 
 export const criticidadeMeta: CriticidadeMeta = {

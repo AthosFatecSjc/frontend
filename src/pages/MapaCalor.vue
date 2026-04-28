@@ -1,27 +1,42 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import HeatmapGeoMap from '@/components/mapa/HeatmapGeoMap.vue'
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout.vue'
-import { conjuntosMock, criticidadeMeta, legendItems } from '@/services/mapaService'
+import { criticidadeMeta, fetchMapaCalorData, fetchMunicipiosLayer, legendItems } from '@/services/mapaService'
 import type { Conjunto, FiltrosMapa } from '@/types/mapa'
 
 const mapRef = ref<InstanceType<typeof HeatmapGeoMap> | null>(null)
 
 const initialFilters: FiltrosMapa = {
-  ano: '2022',
-  distribuidora: 'RGE Sul',
-  estado: 'RS',
+  ano: '',
+  distribuidora: 'todas',
+  estado: 'todos',
   conjunto: 'todos',
   subestacao: 'todas',
 }
 
 const draftFilters = ref<FiltrosMapa>({ ...initialFilters })
 const activeFilters = ref<FiltrosMapa>({ ...initialFilters })
-const conjuntos = ref<Conjunto[]>(conjuntosMock)
-const selectedConjuntoId = ref(conjuntos.value[0]?.id ?? '')
+const conjuntos = ref<Conjunto[]>([])
+const anosDisponiveis = ref<string[]>([])
+const municipiosGeoJson = ref<GeoJSON.FeatureCollection<GeoJSON.Geometry> | null>(null)
+const selectedConjuntoId = ref('')
+const loadingMapa = ref(false)
+const loadError = ref('')
+const municipiosWarning = ref('')
 
-const anoOptions = ['2022', '2023', '2024']
+const anoOptions = computed(() => {
+  if (anosDisponiveis.value.length > 0) {
+    return anosDisponiveis.value
+  }
+
+  if (draftFilters.value.ano) {
+    return [draftFilters.value.ano]
+  }
+
+  return []
+})
 
 const distribuidoraOptions = computed(() => {
   const items = Array.from(new Set(conjuntos.value.map((item) => item.distribuidora)))
@@ -74,15 +89,74 @@ function ensureSelected() {
   }
 }
 
-function applyFilters() {
+async function loadMunicipios() {
+  municipiosWarning.value = ''
+
+  try {
+    const ufs = Array.from(new Set(conjuntos.value.map((item) => item.estado).filter(Boolean)))
+    const data = await fetchMunicipiosLayer(ufs)
+    municipiosGeoJson.value = data
+
+    if (!data.features.length) {
+      municipiosWarning.value = 'Nao foi possivel carregar a camada municipal no momento.'
+    }
+  } catch {
+    municipiosGeoJson.value = null
+    municipiosWarning.value = 'Nao foi possivel carregar a camada municipal no momento.'
+  }
+}
+
+async function loadMapaData(ano?: string) {
+  loadingMapa.value = true
+  loadError.value = ''
+
+  try {
+    const data = await fetchMapaCalorData(ano)
+    conjuntos.value = data.conjuntos
+    anosDisponiveis.value = data.anosDisponiveis
+
+    if (!draftFilters.value.ano) {
+      const anoPadrao = data.anosDisponiveis[0] ?? String(new Date().getFullYear())
+      draftFilters.value.ano = anoPadrao
+      activeFilters.value.ano = anoPadrao
+    }
+
+    await loadMunicipios()
+    ensureSelected()
+  } catch (error) {
+    const message = error instanceof Error && error.message.trim()
+      ? error.message
+      : 'Nao foi possivel carregar os dados do mapa de calor.'
+    loadError.value = message
+    conjuntos.value = []
+    municipiosGeoJson.value = null
+    ensureSelected()
+  } finally {
+    loadingMapa.value = false
+  }
+}
+
+async function applyFilters() {
+  const anoMudou = draftFilters.value.ano !== activeFilters.value.ano
+
+  if (anoMudou) {
+    await loadMapaData(draftFilters.value.ano)
+  }
+
   activeFilters.value = { ...draftFilters.value }
   ensureSelected()
 }
 
-function clearFilters() {
-  draftFilters.value = { ...initialFilters }
-  activeFilters.value = { ...initialFilters }
-  selectedConjuntoId.value = conjuntos.value[0]?.id ?? ''
+async function clearFilters() {
+  const anoPadrao = anosDisponiveis.value[0] ?? String(new Date().getFullYear())
+  draftFilters.value = {
+    ...initialFilters,
+    ano: anoPadrao,
+  }
+  activeFilters.value = { ...draftFilters.value }
+  selectedConjuntoId.value = ''
+
+  await loadMapaData(anoPadrao)
   mapRef.value?.resetView()
 }
 
@@ -102,6 +176,12 @@ function formatPercent(value: number, limit: number) {
   if (!limit) return 0
   return Math.min(100, Math.round((value / limit) * 100))
 }
+
+onMounted(async () => {
+  await loadMapaData()
+  activeFilters.value = { ...draftFilters.value }
+  ensureSelected()
+})
 </script>
 
 <template>
@@ -109,6 +189,14 @@ function formatPercent(value: number, limit: number) {
     title="Mapa de Calor da Rede"
     description="Visualizacao geoespacial para destacar criticidade regulatoria e operacional por conjunto eletrico."
   >
+    <UiAlert v-if="loadError" tone="danger" class="status-alert">
+      {{ loadError }}
+    </UiAlert>
+
+    <UiAlert v-else-if="municipiosWarning" tone="warning" class="status-alert">
+      {{ municipiosWarning }}
+    </UiAlert>
+
     <UiCard class="filters-panel">
       <div class="filters-grid">
         <div class="field-group">
@@ -157,10 +245,10 @@ function formatPercent(value: number, limit: number) {
         </div>
 
         <div class="field-group field-group--action">
-          <UiButton class="btn-clear" variant="secondary" @click="clearFilters">
+          <UiButton class="btn-clear" variant="secondary" :disabled="loadingMapa" @click="clearFilters">
             Limpar
           </UiButton>
-          <UiButton class="btn-apply" @click="applyFilters">
+          <UiButton class="btn-apply" :disabled="loadingMapa" @click="applyFilters">
             Aplicar filtros
           </UiButton>
         </div>
@@ -190,6 +278,7 @@ function formatPercent(value: number, limit: number) {
               ref="mapRef"
               :conjuntos="filteredConjuntos"
               :selected-conjunto-id="selectedConjuntoId"
+              :municipios-geo-json="municipiosGeoJson"
               @select="selectConjunto"
             />
 
@@ -199,7 +288,11 @@ function formatPercent(value: number, limit: number) {
               <span>{{ selectedConjunto.distribuidora }} | {{ selectedConjunto.estado }}</span>
             </div>
 
-            <div v-if="filteredConjuntos.length === 0" class="map-empty">
+            <div v-if="loadingMapa" class="map-empty">
+              Carregando dados geograficos do mapa...
+            </div>
+
+            <div v-else-if="filteredConjuntos.length === 0" class="map-empty">
               Nenhum conjunto disponivel para os filtros aplicados.
             </div>
           </div>
@@ -221,7 +314,7 @@ function formatPercent(value: number, limit: number) {
         </div>
 
         <p class="map-footnote">
-          Fonte: base geoespacial simulada. Dados de criticidade e indicadores sao mock para composicao do layout.
+          Fonte: PostGIS (camada de conjuntos e indicadores) e IBGE (limites municipais via WFS).
         </p>
       </UiCard>
 
@@ -333,6 +426,10 @@ function formatPercent(value: number, limit: number) {
 </template>
 
 <style scoped>
+.status-alert {
+  margin-bottom: 12px;
+}
+
 .filters-panel {
   padding: 18px 20px;
   margin-bottom: 20px;

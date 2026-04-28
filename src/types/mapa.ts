@@ -18,7 +18,7 @@ export type Conjunto = {
   indicadoresPrincipais: Indicador[]
   complementares: Indicador[]
   periodoReferencia: string
-  geometry: GeoJSON.Polygon
+  geometry: GeoJSON.Geometry
 }
 
 export type FiltrosMapa = {
@@ -34,3 +34,8 @@ export type CriticidadeMeta = Record<Criticidade, {
   descricao: string
   tone: 'success' | 'warning' | 'danger' | 'neutral'
 }>
+
+export type MapaCalorApiResponse = {
+  anosDisponiveis: number[]
+  conjuntos: Conjunto[]
+}
