@@ -7,7 +7,7 @@ import { API_BASE_URL, createProtectedJsonRequest } from '@/services/api'
 
 type UserStatus = 'ATIVO' | 'PENDENTE' | 'REJEITADO'
 type UserRole = 'ADMIN' | 'USUARIO'
-type DialogType = 'details' | 'edit' | 'approve' | 'reject' | 'role'
+type DialogType = 'details' | 'edit' | 'approve' | 'reject' | 'role' | 'delete'
 
 type UserRow = {
   id: string
@@ -344,6 +344,36 @@ async function confirmRoleChange() {
   }
 }
 
+async function confirmAnonymizeUser() {
+  if (!selectedUser.value) return
+
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/usuarios/${selectedUser.value.id}/anonimizar`,
+      {
+        ...createProtectedJsonRequest(),
+        method: 'POST',
+      },
+    )
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}))
+      throw new Error(errorBody.message || 'Falha ao deletar usuário')
+    }
+
+    feedbackMessage.value = `${selectedUser.value.nomeCompleto} foi deletado(a) com sucesso.`
+    closeDialog()
+    await loadUsers()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Erro ao deletar usuário'
+  } finally {
+    isLoading.value = false
+  }
+}
+
 function resetFilters() {
   filters.query = ''
   filters.status = ''
@@ -479,6 +509,9 @@ onMounted(() => {
                   <div class="action-row">
                     <button type="button" class="action-button action-button--ghost" @click="openDialog('details', user)">Visualizar</button>
                     <button type="button" class="action-button action-button--ghost" @click="openDialog('edit', user)">Editar</button>
+                    <button type="button" class="action-button action-button--danger" @click="openDialog('delete', user)">
+                      deletar
+                    </button>
                     <button
                       v-if="user.status === 'PENDENTE'"
                       type="button"
@@ -612,6 +645,23 @@ onMounted(() => {
               ? 'Atualizando...'
               : (roleChangeTargetRole === 'ADMIN' ? 'Sim, tornar ADMIN' : 'Sim, tornar USUÁRIO')
             }}
+          </UiButton>
+        </div>
+      </div>
+
+      <div v-else-if="selectedDialog === 'delete' && selectedUser" class="modal-card modal-card--compact">
+        <button type="button" class="modal-close" aria-label="Fechar" @click="closeDialog">×</button>
+        <p class="modal-title modal-title--compact">Anonimizar este usuário?</p>
+        <p class="modal-description">
+          Essa ação remove os dados pessoais do cadastro e não pode ser desfeita.
+        </p>
+
+        <div class="modal-actions">
+          <UiButton variant="secondary" class="modal-action" @click="closeDialog" :disabled="isLoading">
+            Cancelar
+          </UiButton>
+          <UiButton class="modal-action modal-action--danger" @click="confirmAnonymizeUser" :disabled="isLoading">
+            {{ isLoading ? 'Anonimizando...' : 'Sim, anonimizar' }}
           </UiButton>
         </div>
       </div>
