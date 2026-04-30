@@ -14,6 +14,7 @@ const route = useRoute()
 
 const items = [
   { label: 'Minha Conta', to: '/minha-conta', icon: 'user', match: ['/minha-conta'] },
+  { label: 'Mapa de Calor', to: '/mapa-calor', icon: 'map', match: ['/mapa-calor'] },
   { label: 'Gestão de Usuários', to: '/admin/usuarios', icon: 'users', match: ['/admin/usuarios'] },
   { label: 'Logs e Auditoria', to: '/admin/logs', icon: 'logs', match: ['/admin/logs'] },
 ]
@@ -21,7 +22,7 @@ const items = [
 const visibleItems = computed(() => items.map(item => ({
   ...item,
   isActive: item.match.some(path => route.path.startsWith(path)),
-})).filter((item) => item.to === '/minha-conta' || hasAdminAccess()))
+})).filter((item) => item.to === '/minha-conta' || item.to === '/mapa-calor' || hasAdminAccess()))
 </script>
 
 <template>
@@ -42,7 +43,25 @@ const visibleItems = computed(() => items.map(item => ({
       >
         <span class="modules-menu__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" class="modules-menu__svg">
-            <template v-if="item.icon === 'logs'">
+            <template v-if="item.icon === 'map'">
+              <path
+                d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+              <path
+                d="M9 4v14M15 6v14"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+            </template>
+            <template v-else-if="item.icon === 'logs'">
               <path
                 d="M14 3h-4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9Z"
                 fill="none"

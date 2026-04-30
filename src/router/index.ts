@@ -30,6 +30,11 @@ const router = createRouter({
       component: () => import('../pages/Dashboard.vue'),
     },
     {
+      path: '/mapa-calor',
+      name: 'MapaCalor',
+      component: () => import('../pages/MapaCalor.vue'),
+    },
+    {
       path: '/minha-conta',
       name: 'MinhaConta',
       component: () => import('../pages/MinhaConta.vue'),
