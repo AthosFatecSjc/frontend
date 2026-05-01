@@ -1,7 +1,7 @@
 export interface ConsentimentoDocumento {
   documentId: string
   type: string
-  version: number
+  clause: number
   content: string
   required: boolean
 }
@@ -17,7 +17,7 @@ export interface UsuarioCadastroRequest {
   email: string
   senha: string
   telefone?: string
-  termsNames: string[]
+  termsIds: string[]
 }
 
 export interface UsuarioCadastroResponse {

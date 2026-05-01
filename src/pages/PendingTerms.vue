@@ -63,7 +63,7 @@ async function carregarTela() {
   errorMessage.value = ''
 
   try {
-    documentos.value = await getPendingTerms()
+    documentos.value = await getPendingTerms(true)
 
     if (!documentos.value) {
       router.replace('/')
@@ -115,6 +115,8 @@ function sair() {
 onMounted(() => {
   void carregarTela()
 })
+
+
 </script>
 
 <template>
@@ -123,7 +125,7 @@ onMounted(() => {
     <main class="pending-main">
       <UiCard class="pending-card">
         <AppHeading class="pending-head" eyebrow="Consentimentos" title="Revise os termos antes de entrar"
-          subtitle="Quando uma versao vigente muda, o acesso fica bloqueado ate voce decidir sobre os documentos pendentes."
+          subtitle="Quando um termo é editado ou cadastrado, o acesso fica bloqueado ate voce aceitar os termos obrigatórios atualizados."
           size="lg" />
 
         <UiAlert v-if="errorMessage" tone="danger">
@@ -142,14 +144,10 @@ onMounted(() => {
             </div>
             <div v-for="(clauseContent, i) in termsGroup.contents" class="document-content">{{ i + 1 }}. {{
               clauseContent
-            }}</div>
+              }}</div>
           </section>
 
-          <label v-if="optionalPendingIds.length" class="marketing-choice">
-            <input v-model="aceitarMarketing" type="checkbox">
-            <span>Desejo aceitar o consentimento opcional de comunicacao vigente.</span>
-          </label>
-
+ 
           <div class="confirmation-block">
             <UiLabel for="pending-password">Confirme sua senha para concluir</UiLabel>
             <UiInput id="pending-password" v-model="senha" type="password" placeholder="Digite sua senha" />

@@ -1,5 +1,5 @@
 import type { ConsentimentosVigentesResponse } from '../types/cadastro'
-import type { LoginResponse,  } from '../types/auth'
+import type { LoginResponse, } from '../types/auth'
 import { API_BASE_URL } from './api'
 import { getAuthUser } from './authService'
 import type { Terms } from '@/types/terms'
@@ -23,14 +23,14 @@ export async function buscarDocumentosVigentes(): Promise<ConsentimentosVigentes
   return response.json() as Promise<ConsentimentosVigentesResponse>
 }
 
-export async function getPendingTerms(): Promise<Terms[]> {
+export async function getPendingTerms(requiredOnly = false): Promise<Terms[]> {
   const authUser = getAuthUser()
 
   if (!authUser) {
     throw new Error('Usuario nao autenticado.')
   }
 
-  const response = await fetch(`${API_BASE_URL}/users/${authUser.userId}/terms/pending`);
+  const response = await fetch(`${API_BASE_URL}/users/${authUser.userId}/terms/pending?apenasObrigatorios=${requiredOnly}`);
 
   if (!response.ok) {
     throw new Error('Nao foi possivel verificar os termos pendentes.')
