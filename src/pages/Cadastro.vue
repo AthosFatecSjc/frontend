@@ -9,7 +9,6 @@ import type {
   BackendErrorResponse,
   UsuarioCadastroRequest,
   ConsentimentosVigentesResponse,
-  AcceptedTerm
 } from '../types/cadastro'
 
 type FeedbackTone = 'info' | 'danger'
@@ -26,11 +25,10 @@ const telefone = ref('')
 
 const aceitaTermo = ref(false)
 const aceitaPrivacidade = ref(false)
-const aceitaMarketing = ref(false)
+const aceitaMarketing = ref([])
 
 const showTermsDialog = ref(false)
 const showPrivacyDialog = ref(false)
-const showMarketingDialog = ref(false)
 
 const isLoading = ref(false)
 
@@ -107,45 +105,27 @@ function validateForm() {
     isValid = false
   }
 
-  if (currentTerms.value?.terms.required && !aceitaTermo.value) {
-    setDangerFeedback('Você precisa aceitar o Termo de Uso para continuar.')
+  const termsErrors = []
+
+  if (!aceitaTermo.value) {
+    console.log("Termo de uso não aceito", aceitaTermo.value)
+    termsErrors.push('Você precisa aceitar o(s) Termo(s) de Uso.')
     isValid = false
   }
 
-  if (currentTerms.value?.privacy.required && !aceitaPrivacidade.value) {
-    setDangerFeedback('Você precisa confirmar ciência do Aviso de Privacidade.')
+  if (!aceitaPrivacidade.value) {
+    termsErrors.push('Você precisa confirmar ciência do(s) Aviso(s) de Privacidade.')
     isValid = false
   }
+
+  if (termsErrors.length > 0) {
+    setDangerFeedback(termsErrors.join('\n'))
+  }
+
 
   return isValid
 }
 
-function mountTerms() {
-  let acceptedTerms: AcceptedTerm[] = []
-  
-  if (aceitaTermo.value && currentTerms.value?.terms) {
-    acceptedTerms.push({
-      id: currentTerms.value.terms.documentId,
-      version: currentTerms.value.terms.version,
-    })
-  }
-
-  if (aceitaPrivacidade.value && currentTerms.value?.privacy) {
-    acceptedTerms.push({
-      id: currentTerms.value.privacy.documentId,
-      version: currentTerms.value.privacy.version,
-    })
-  }
-
-  if (aceitaMarketing.value && currentTerms.value?.marketing) {
-    acceptedTerms.push({
-      id: currentTerms.value.marketing.documentId,
-      version: currentTerms.value.marketing.version,
-    })
-  }
-
-  return acceptedTerms
-}
 
 async function onSubmit() {
   if (!validateForm()) {
@@ -158,7 +138,11 @@ async function onSubmit() {
     nomeCompleto: nome.value.trim(),
     email: email.value.trim(),
     senha: senha.value,
-    terms: mountTerms(),
+    termsIds: [
+      ...(aceitaTermo.value ? currentTerms.value?.terms.map(clause => clause.documentId) || [] : []),
+      ...(aceitaPrivacidade.value ? currentTerms.value?.privacy.map(clause => clause.documentId) || [] : []),
+      ...aceitaMarketing.value,
+    ],
   }
 
   if (telefone.value.trim()) {
@@ -232,63 +216,37 @@ onMounted(() => {
     <main class="login-main spaced">
       <UiCard class="login-card">
         <header class="login-head">
-          <AppHeading
-            eyebrow="Cadastro"
-            title="Solicitar acesso à plataforma"
+          <AppHeading eyebrow="Cadastro" title="Solicitar acesso à plataforma"
             subtitle="Preencha seus dados para solicitar acesso. Seu cadastro será analisado por um administrador."
-            size="lg"
-          />
+            size="lg" />
         </header>
 
         <form v-if="!isSuccess" class="login-form" @submit.prevent="onSubmit">
-          <UiAlert v-if="feedbackMessage" :tone="feedbackTone">
-            {{ feedbackMessage }}
-          </UiAlert>
-
           <div class="login-field">
             <UiLabel for="cadastro-nome">Nome completo *</UiLabel>
-            <UiInput
-              id="cadastro-nome"
-              v-model="nome"
-              placeholder="Seu nome completo"
-              :class="{ 'input-error': errors.nome }"
-            />
+            <UiInput id="cadastro-nome" v-model="nome" placeholder="Seu nome completo"
+              :class="{ 'input-error': errors.nome }" />
             <small v-if="errors.nome" class="error-text">{{ errors.nome }}</small>
           </div>
 
           <div class="login-field">
             <UiLabel for="cadastro-email">E-mail *</UiLabel>
-            <UiInput
-              id="cadastro-email"
-              v-model="email"
-              type="email"
-              placeholder="seu.email@empresa.com"
-              :class="{ 'input-error': errors.email }"
-            />
+            <UiInput id="cadastro-email" v-model="email" type="email" placeholder="seu.email@empresa.com"
+              :class="{ 'input-error': errors.email }" />
             <small v-if="errors.email" class="error-text">{{ errors.email }}</small>
           </div>
 
           <div class="login-field">
             <UiLabel for="cadastro-senha">Senha *</UiLabel>
-            <UiInput
-              id="cadastro-senha"
-              v-model="senha"
-              type="password"
-              placeholder="Digite sua senha"
-              :class="{ 'input-error': errors.senha }"
-            />
+            <UiInput id="cadastro-senha" v-model="senha" type="password" placeholder="Digite sua senha"
+              :class="{ 'input-error': errors.senha }" />
             <small v-if="errors.senha" class="error-text">{{ errors.senha }}</small>
           </div>
 
           <div class="login-field">
             <UiLabel for="cadastro-confirmar-senha">Confirmar senha *</UiLabel>
-            <UiInput
-              id="cadastro-confirmar-senha"
-              v-model="confirmarSenha"
-              type="password"
-              placeholder="Confirme sua senha"
-              :class="{ 'input-error': errors.confirmarSenha }"
-            />
+            <UiInput id="cadastro-confirmar-senha" v-model="confirmarSenha" type="password"
+              placeholder="Confirme sua senha" :class="{ 'input-error': errors.confirmarSenha }" />
             <small v-if="errors.confirmarSenha" class="error-text">{{ errors.confirmarSenha }}</small>
           </div>
 
@@ -301,7 +259,7 @@ onMounted(() => {
             <label v-if="currentTerms?.terms" class="term-item">
               <input v-model="aceitaTermo" type="checkbox">
               <span>
-                Li e aceito o Termo de Uso
+                Li e aceito o Termo de Uso *
                 <button type="button" class="term-link" @click="showTermsDialog = true">
                   Visualizar Termo de Uso
                 </button>
@@ -311,23 +269,24 @@ onMounted(() => {
             <label v-if="currentTerms?.privacy" class="term-item">
               <input v-model="aceitaPrivacidade" type="checkbox">
               <span>
-                Li o Aviso de Privacidade
+                Li o Aviso de Privacidade *
                 <button type="button" class="term-link" @click="showPrivacyDialog = true">
                   Visualizar Aviso de Privacidade
                 </button>
               </span>
             </label>
 
-            <label v-if="currentTerms?.marketing" class="term-item">
-              <input v-model="aceitaMarketing" type="checkbox">
+            <label v-for="clause in currentTerms?.marketing" class="term-item">
+              <input v-model="aceitaMarketing" :value="clause.documentId" type="checkbox"> 
               <span>
-                Aceito receber comunicações e novidades por e-mail
-                <button type="button" class="term-link" @click="showMarketingDialog = true">
-                  Visualizar Consentimento de Comunicação
-                </button>
+                {{ clause.content }}
               </span>
             </label>
           </div>
+
+          <UiAlert v-if="feedbackMessage" :tone="feedbackTone">
+            {{ feedbackMessage }}
+          </UiAlert>
 
           <UiButton class="login-submit" type="submit" :disabled="isSubmitDisabled">
             {{ submitText }}
@@ -364,30 +323,27 @@ onMounted(() => {
 
     <div v-if="showTermsDialog" class="modal-overlay" @click.self="showTermsDialog = false">
       <div class="modal-card">
-        <h3>Termo de Uso - {{ currentTerms?.terms.type }}</h3>
-        <p class="doc-version">Version: {{ currentTerms?.terms.version }}</p>
-        <div class="doc-content">{{ currentTerms?.terms.content }}</div>
+        <h3>Termos de Uso</h3>
+        <div v-for="(clause, i) in currentTerms?.terms" class="document-content doc-content">{{ i + 1 }}. {{
+          clause.content
+        }}</div>
+
         <button type="button" class="modal-close" @click="showTermsDialog = false">Fechar</button>
       </div>
     </div>
 
     <div v-if="showPrivacyDialog" class="modal-overlay" @click.self="showPrivacyDialog = false">
       <div class="modal-card">
-        <h3>Aviso de Privacidade - {{ currentTerms?.privacy.type }}</h3>
-        <p class="doc-version">Version: {{ currentTerms?.privacy.version }}</p>
-        <div class="doc-content">{{ currentTerms?.privacy.content }}</div>
+        <h3>Termos de Privacidade</h3>
+        <div v-for="(clause, i) in currentTerms?.privacy" class="document-content doc-content">{{ i + 1 }}. {{
+          clause.content
+        }}</div>
+
         <button type="button" class="modal-close" @click="showPrivacyDialog = false">Fechar</button>
       </div>
     </div>
-  
-    <div v-if="showMarketingDialog" class="modal-overlay" @click.self="showMarketingDialog = false">
-      <div class="modal-card">
-        <h3>Consentimento de Comunicação - {{ currentTerms?.marketing.type }}</h3>
-        <p class="doc-version">Version: {{ currentTerms?.marketing.version }}</p>
-        <div class="doc-content">{{ currentTerms?.marketing.content }}</div>
-        <button type="button" class="modal-close" @click="showMarketingDialog = false">Fechar</button>
-      </div>
-    </div>
+
+
   </div>
 </template>
 

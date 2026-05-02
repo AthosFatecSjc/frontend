@@ -4,31 +4,34 @@ import { useRouter } from 'vue-router'
 
 import AppHeading from '../components/utils/AppHeading.vue'
 import { clearAuthSession } from '../services/authService'
-import {
-  buscarDocumentosVigentes,
-  clearPendingTermsContext,
-  getPendingTermsContext,
-  resolverPendenciasDeTermos,
-} from '../services/termsService'
-import type { ConsentimentoDocumento, ConsentimentosVigentesResponse } from '../types/cadastro'
+import { getPendingTerms, resolverPendenciasDeTermos } from '../services/termsService'
+import type { Terms } from '@/types/terms'
+
+type TermGroup = {
+  type: string;
+  required: boolean;
+  ids: string[];
+  contents: string[];
+};
 
 const router = useRouter()
 
+const isCheckingPendingContext = ref(true)
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
-const documentos = ref<ConsentimentosVigentesResponse | null>(null)
-const pendingEmail = ref('')
+const documentos = ref<Terms[] | null>(null)
 const senha = ref('')
-const pendingTerms = ref<{ termId: string; type: string; version: number; required: boolean }[]>([])
 const aceitarMarketing = ref(false)
 
+const documentosOrEmpty = computed(() => documentos.value ?? [])
+
 const requiredPendingIds = computed(() =>
-  pendingTerms.value.filter(item => item.required).map(item => item.termId),
+  documentosOrEmpty.value.filter(item => item.required).map(item => item.termId),
 )
 
 const optionalPendingIds = computed(() =>
-  pendingTerms.value.filter(item => !item.required).map(item => item.termId),
+  documentosOrEmpty.value.filter(item => !item.required).map(item => item.termId),
 )
 
 const documentosPendentes = computed(() => {
@@ -36,12 +39,23 @@ const documentosPendentes = computed(() => {
     return []
   }
 
-  const vigentes = [documentos.value.terms, documentos.value.privacy, documentos.value.marketing]
-    .filter((item): item is ConsentimentoDocumento => Boolean(item))
+  return documentosOrEmpty.value.reduce((acc, item) => {
+    const group = acc.find(g => g.type === item.typeName && g.required === item.required)
 
-  return vigentes.filter(item =>
-    pendingTerms.value.some(pending => pending.termId === item.documentId),
-  )
+    if (group) {
+      group.ids.push(item.termId)
+      group.contents.push(item.content)
+    } else {
+      acc.push({
+        type: item.typeName,
+        required: item.required,
+        ids: [item.termId],
+        contents: [item.content],
+      })
+    }
+
+    return acc
+  }, [] as TermGroup[])
 })
 
 async function carregarTela() {
@@ -49,15 +63,15 @@ async function carregarTela() {
   errorMessage.value = ''
 
   try {
-    const context = getPendingTermsContext()
-    if (!context) {
-      await router.replace('/login')
+    documentos.value = await getPendingTerms(true)
+
+    if (!documentos.value) {
+      router.replace('/')
       return
     }
 
-    pendingEmail.value = context.email
-    pendingTerms.value = context.pendingTerms
-    documentos.value = await buscarDocumentosVigentes()
+    isCheckingPendingContext.value = false
+
     aceitarMarketing.value = optionalPendingIds.value.length === 0
   } catch (error) {
     errorMessage.value = error instanceof Error
@@ -79,7 +93,6 @@ async function confirmar() {
 
   try {
     await resolverPendenciasDeTermos({
-      email: pendingEmail.value,
       senha: senha.value,
       requiredTermsIds: requiredPendingIds.value,
       optionalAcceptedTermsIds: aceitarMarketing.value ? optionalPendingIds.value : [],
@@ -95,7 +108,6 @@ async function confirmar() {
 }
 
 function sair() {
-  clearPendingTermsContext()
   clearAuthSession()
   router.replace('/login')
 }
@@ -103,20 +115,18 @@ function sair() {
 onMounted(() => {
   void carregarTela()
 })
+
+
 </script>
 
 <template>
-  <div class="pending-shell">
+  <div v-if="isCheckingPendingContext" class="pending-shell">Carregando...</div>
+  <div v-else class="pending-shell">
     <main class="pending-main">
       <UiCard class="pending-card">
-        <header class="pending-head">
-          <AppHeading
-            eyebrow="Consentimentos"
-            title="Revise os termos antes de entrar"
-            subtitle="Quando uma versao vigente muda, o acesso fica bloqueado ate voce decidir sobre os documentos pendentes."
-            size="lg"
-          />
-        </header>
+        <AppHeading class="pending-head" eyebrow="Consentimentos" title="Revise os termos antes de entrar"
+          subtitle="Quando um termo é editado ou cadastrado, o acesso fica bloqueado ate voce aceitar os termos obrigatórios atualizados."
+          size="lg" />
 
         <UiAlert v-if="errorMessage" tone="danger">
           {{ errorMessage }}
@@ -127,31 +137,20 @@ onMounted(() => {
         </div>
 
         <template v-else>
-          <section
-            v-for="documento in documentosPendentes"
-            :key="documento.documentId"
-            class="document-block"
-          >
+          <section v-for="termsGroup in documentosPendentes" :key="termsGroup.type" class="document-block">
             <div class="document-meta">
-              <strong>{{ documento.type }}</strong>
-              <span>Versao {{ documento.version }}</span>
+              <strong>{{ termsGroup.type }}</strong>
+              <span>{{ termsGroup.ids.length }} Cláusulas</span>
             </div>
-            <div class="document-content">{{ documento.content }}</div>
+            <div v-for="(clauseContent, i) in termsGroup.contents" class="document-content">{{ i + 1 }}. {{
+              clauseContent
+              }}</div>
           </section>
 
-          <label v-if="optionalPendingIds.length" class="marketing-choice">
-            <input v-model="aceitarMarketing" type="checkbox">
-            <span>Desejo aceitar o consentimento opcional de comunicacao vigente.</span>
-          </label>
-
+ 
           <div class="confirmation-block">
             <UiLabel for="pending-password">Confirme sua senha para concluir</UiLabel>
-            <UiInput
-              id="pending-password"
-              v-model="senha"
-              type="password"
-              placeholder="Digite sua senha"
-            />
+            <UiInput id="pending-password" v-model="senha" type="password" placeholder="Digite sua senha" />
           </div>
 
           <div class="pending-actions">
@@ -160,7 +159,7 @@ onMounted(() => {
             </UiButton>
 
             <UiButton type="button" variant="secondary" @click="sair">
-              Voltar ao login
+              Sair
             </UiButton>
           </div>
         </template>
@@ -185,12 +184,12 @@ onMounted(() => {
 
 .pending-card {
   display: grid;
-  gap: 20px;
+  gap: 2rem;
 }
 
 .pending-head {
   display: grid;
-  gap: 12px;
+  gap: 1rem;
 }
 
 .pending-loading {

@@ -12,31 +12,6 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api/auth': {
-        target: 'http://localhost:8181',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
-      },
-      '/api/usuarios': {
-        target: 'http://localhost:8181',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
-      },
-      '/api/indicadores': {
-        target: 'http://localhost:8181',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
-      },
-      '/api/admin': {
-        target: 'http://localhost:8181',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
-      },
-      '/api/documentos': {
-        target: 'http://localhost:8181',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
-      },
       '/java': {
         target: 'http://localhost:8181',
         changeOrigin: true,
@@ -46,7 +21,15 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/python/, '')
-      }
+      },
+
+      // Fallback: Match any routes here if no other explicit rule for that path is defined above.
+      // By default, any `/api` routes will redirect to java backend
+      '/api': {
+        target: 'http://localhost:8181',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      },
     }
   }
 })

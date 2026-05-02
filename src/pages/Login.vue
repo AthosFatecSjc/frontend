@@ -36,11 +36,12 @@ async function onSubmit() {
     }
 
     status.value = { type: result.type, message: result.message }
-  } catch {
+  } catch (error) {
     status.value = {
       type: 'invalid',
       message: 'Nao foi possivel realizar login. Tente novamente.',
     }
+    console.error('Erro durante login:', error)
   } finally {
     isLoading.value = false
   }

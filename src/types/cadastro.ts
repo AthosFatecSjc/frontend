@@ -1,15 +1,15 @@
 export interface ConsentimentoDocumento {
   documentId: string
   type: string
-  version: number
+  clause: number
   content: string
   required: boolean
 }
 
-export interface ConsentimentosVigentesResponse {
-  terms: ConsentimentoDocumento
-  privacy: ConsentimentoDocumento
-  marketing: ConsentimentoDocumento
+export type ConsentimentosVigentesResponse = {
+  terms: ConsentimentoDocumento[]
+  privacy: ConsentimentoDocumento[]
+  marketing: ConsentimentoDocumento[]
 }
 
 export interface UsuarioCadastroRequest {
@@ -17,12 +17,7 @@ export interface UsuarioCadastroRequest {
   email: string
   senha: string
   telefone?: string
-  terms: AcceptedTerm[]
-}
-
-export interface AcceptedTerm {
-  id: string
-  version: number
+  termsIds: string[]
 }
 
 export interface UsuarioCadastroResponse {
