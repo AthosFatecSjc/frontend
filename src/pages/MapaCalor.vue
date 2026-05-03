@@ -10,6 +10,7 @@ const mapRef = ref<InstanceType<typeof HeatmapGeoMap> | null>(null)
 
 const initialFilters: FiltrosMapa = {
   ano: '',
+  mes: '',
   distribuidora: 'todas',
   estado: 'todos',
   conjunto: 'todos',
@@ -20,11 +21,27 @@ const draftFilters = ref<FiltrosMapa>({ ...initialFilters })
 const activeFilters = ref<FiltrosMapa>({ ...initialFilters })
 const conjuntos = ref<Conjunto[]>([])
 const anosDisponiveis = ref<string[]>([])
+const mesesDisponiveis = ref<string[]>([])
 const municipiosGeoJson = ref<GeoJSON.FeatureCollection<GeoJSON.Geometry> | null>(null)
 const selectedConjuntoId = ref('')
 const loadingMapa = ref(false)
 const loadError = ref('')
 const municipiosWarning = ref('')
+
+const monthLabels = [
+  'Janeiro',
+  'Fevereiro',
+  'Marco',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+]
 
 const anoOptions = computed(() => {
   if (anosDisponiveis.value.length > 0) {
@@ -36,6 +53,17 @@ const anoOptions = computed(() => {
   }
 
   return []
+})
+
+const mesOptions = computed(() => {
+  const items = mesesDisponiveis.value.length > 0
+    ? mesesDisponiveis.value
+    : Array.from({ length: 12 }, (_, index) => String(index + 1))
+
+  return items.map((mes) => ({
+    value: mes,
+    label: monthLabels[Number(mes) - 1] ?? `Mes ${mes}`,
+  }))
 })
 
 const distribuidoraOptions = computed(() => {
@@ -106,19 +134,34 @@ async function loadMunicipios() {
   }
 }
 
-async function loadMapaData(ano?: string) {
+async function loadMapaData(ano?: string, mes?: string, allowFallback = true) {
   loadingMapa.value = true
   loadError.value = ''
 
   try {
-    const data = await fetchMapaCalorData(ano)
+    const data = await fetchMapaCalorData(ano, mes)
     conjuntos.value = data.conjuntos
     anosDisponiveis.value = data.anosDisponiveis
+    mesesDisponiveis.value = data.mesesDisponiveis
 
     if (!draftFilters.value.ano) {
       const anoPadrao = data.anosDisponiveis[0] ?? String(new Date().getFullYear())
       draftFilters.value.ano = anoPadrao
       activeFilters.value.ano = anoPadrao
+    }
+
+    if (!draftFilters.value.mes) {
+      const mesPadrao = data.mesesDisponiveis[0] ?? String(new Date().getMonth() + 1)
+      draftFilters.value.mes = mesPadrao
+      activeFilters.value.mes = mesPadrao
+    }
+
+    if (allowFallback && mes && data.mesesDisponiveis.length > 0 && !data.mesesDisponiveis.includes(mes)) {
+      const mesPadrao = data.mesesDisponiveis[0]!
+      draftFilters.value.mes = mesPadrao
+      activeFilters.value.mes = mesPadrao
+      await loadMapaData(ano, mesPadrao, false)
+      return
     }
 
     await loadMunicipios()
@@ -129,6 +172,7 @@ async function loadMapaData(ano?: string) {
       : 'Nao foi possivel carregar os dados do mapa de calor.'
     loadError.value = message
     conjuntos.value = []
+    mesesDisponiveis.value = []
     municipiosGeoJson.value = null
     ensureSelected()
   } finally {
@@ -138,9 +182,10 @@ async function loadMapaData(ano?: string) {
 
 async function applyFilters() {
   const anoMudou = draftFilters.value.ano !== activeFilters.value.ano
+  const mesMudou = draftFilters.value.mes !== activeFilters.value.mes
 
-  if (anoMudou) {
-    await loadMapaData(draftFilters.value.ano)
+  if (anoMudou || mesMudou) {
+    await loadMapaData(draftFilters.value.ano, draftFilters.value.mes)
   }
 
   activeFilters.value = { ...draftFilters.value }
@@ -149,14 +194,16 @@ async function applyFilters() {
 
 async function clearFilters() {
   const anoPadrao = anosDisponiveis.value[0] ?? String(new Date().getFullYear())
+  const mesPadrao = mesesDisponiveis.value[0] ?? String(new Date().getMonth() + 1)
   draftFilters.value = {
     ...initialFilters,
     ano: anoPadrao,
+    mes: mesPadrao,
   }
   activeFilters.value = { ...draftFilters.value }
   selectedConjuntoId.value = ''
 
-  await loadMapaData(anoPadrao)
+  await loadMapaData(anoPadrao, mesPadrao)
   mapRef.value?.resetView()
 }
 
@@ -204,6 +251,15 @@ onMounted(async () => {
           <select id="filter-ano" v-model="draftFilters.ano" class="field-select">
             <option v-for="ano in anoOptions" :key="ano" :value="ano">
               {{ ano }}
+            </option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <UiLabel class="field-label" for="filter-mes">Mes</UiLabel>
+          <select id="filter-mes" v-model="draftFilters.mes" class="field-select">
+            <option v-for="option in mesOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
             </option>
           </select>
         </div>
@@ -437,7 +493,7 @@ onMounted(async () => {
 
 .filters-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(220px, auto);
+  grid-template-columns: repeat(6, minmax(120px, 1fr)) minmax(220px, auto);
   gap: 12px;
   align-items: end;
 }

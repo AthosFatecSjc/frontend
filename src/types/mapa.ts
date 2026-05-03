@@ -23,6 +23,7 @@ export type Conjunto = {
 
 export type FiltrosMapa = {
   ano: string
+  mes: string
   distribuidora: string
   estado: string
   conjunto: string
@@ -37,5 +38,6 @@ export type CriticidadeMeta = Record<Criticidade, {
 
 export type MapaCalorApiResponse = {
   anosDisponiveis: number[]
+  mesesDisponiveis?: number[]
   conjuntos: Conjunto[]
 }
