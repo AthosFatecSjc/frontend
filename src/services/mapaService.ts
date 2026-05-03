@@ -4,6 +4,7 @@ import type { Conjunto, Criticidade, CriticidadeMeta, MapaCalorApiResponse } fro
 type MapaCalorServiceResponse = {
   conjuntos: Conjunto[]
   anosDisponiveis: string[]
+  mesesDisponiveis: string[]
 }
 
 const EMPTY_GEOJSON: GeoJSON.FeatureCollection<GeoJSON.Geometry> = {
@@ -75,10 +76,13 @@ function normalizeConjunto(raw: RawConjunto): Conjunto | null {
   }
 }
 
-export async function fetchMapaCalorData(ano?: string): Promise<MapaCalorServiceResponse> {
+export async function fetchMapaCalorData(ano?: string, mes?: string): Promise<MapaCalorServiceResponse> {
   const params = new URLSearchParams()
   if (ano) {
     params.set('ano', ano)
+  }
+  if (mes) {
+    params.set('mes', mes)
   }
 
   const query = params.toString()
@@ -94,10 +98,12 @@ export async function fetchMapaCalorData(ano?: string): Promise<MapaCalorService
     .filter((item): item is Conjunto => item !== null)
 
   const anosDisponiveis = (payload.anosDisponiveis ?? []).map((item) => String(item))
+  const mesesDisponiveis = (payload.mesesDisponiveis ?? []).map((item) => String(item))
 
   return {
     conjuntos,
     anosDisponiveis,
+    mesesDisponiveis,
   }
 }
 
