@@ -31,7 +31,7 @@ const municipiosWarning = ref('')
 const monthLabels = [
   'Janeiro',
   'Fevereiro',
-  'Marco',
+  'Março',
   'Abril',
   'Maio',
   'Junho',
@@ -62,7 +62,7 @@ const mesOptions = computed(() => {
 
   return items.map((mes) => ({
     value: mes,
-    label: monthLabels[Number(mes) - 1] ?? `Mes ${mes}`,
+    label: monthLabels[Number(mes) - 1] ?? `Mês ${mes}`,
   }))
 })
 
@@ -256,7 +256,7 @@ onMounted(async () => {
         </div>
 
         <div class="field-group">
-          <UiLabel class="field-label" for="filter-mes">Mes</UiLabel>
+          <UiLabel class="field-label" for="filter-mes">Mês</UiLabel>
           <select id="filter-mes" v-model="draftFilters.mes" class="field-select">
             <option v-for="option in mesOptions" :key="option.value" :value="option.value">
               {{ option.label }}
@@ -493,7 +493,7 @@ onMounted(async () => {
 
 .filters-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(120px, 1fr)) minmax(220px, auto);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
   align-items: end;
 }
@@ -532,6 +532,7 @@ onMounted(async () => {
 .field-group--action {
   display: flex;
   flex-direction: row;
+  grid-column: span 2;
   gap: 10px;
   align-items: stretch;
   justify-content: flex-end;
@@ -873,10 +874,6 @@ onMounted(async () => {
 }
 
 @media (max-width: 1200px) {
-  .filters-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .field-group--action {
     grid-column: 1 / -1;
     justify-content: flex-start;
