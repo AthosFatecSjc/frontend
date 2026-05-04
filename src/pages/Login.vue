@@ -30,17 +30,18 @@ async function onSubmit() {
   try {
     const result = await loginWithStorage(email.value, senha.value)
 
-    if (result.type === 'success' && result.nextRoute) {
+    if (result.nextRoute) {
       await router.push(result.nextRoute)
       return
     }
 
     status.value = { type: result.type, message: result.message }
-  } catch {
+  } catch (error) {
     status.value = {
       type: 'invalid',
-      message: 'Não foi possível realizar login. Tente novamente.',
+      message: 'Nao foi possivel realizar login. Tente novamente.',
     }
+    console.error('Erro durante login:', error)
   } finally {
     isLoading.value = false
   }
@@ -56,9 +57,9 @@ function goToRegister() {
     <header class="login-topbar">
       <div class="login-topbar-inner">
         <div class="brand-lockup">
-          <img class="brand-icon" :src="logoImage" alt="HiAthos" />
+          <img class="brand-icon" :src="logoImage" alt="HiATHOS" />
           <div class="brand-copy">
-            <strong>HiAthos</strong>
+            <strong>HiATHOS</strong>
             <span>TECSYS</span>
           </div>
         </div>
@@ -72,7 +73,7 @@ function goToRegister() {
           <AppHeading
             eyebrow="Autenticacao"
             title="Entrar na plataforma"
-            subtitle="O acesso esta disponivel apenas para usuarios aprovados."
+            subtitle="O acesso esta disponivel apenas para usuarios com conta ativa."
             size="lg"
           />
         </header>

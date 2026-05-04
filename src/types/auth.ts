@@ -1,4 +1,4 @@
-export type UserStatus = 'ATIVO' | 'PENDENTE' | 'REJEITADO' | 'APROVADO'
+export type UserStatus = 'ATIVO' | 'PENDENTE' | 'REJEITADO'
 
 export type LoginResultType = 'success' | 'pending' | 'rejected' | 'invalid'
 
@@ -13,6 +13,7 @@ export interface LoginResponse {
   userId: string
   email: string
   nome: string
+  role?: string | null
 }
 
 export interface BackendAuthError {
@@ -22,6 +23,9 @@ export interface BackendAuthError {
   message: string
   severity: string
   reason: string | null
+  details?: {
+    redirect?: string
+  } | null
 }
 
 export interface LoginResult {

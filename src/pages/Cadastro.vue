@@ -1,18 +1,21 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import logoImage from '../assets/logo.png'
 import AppHeading from '../components/utils/AppHeading.vue'
-import { cadastrarUsuario } from '../services/cadastroService'
+import { cadastrarUsuario, buscarConsentimentosVigentes } from '../services/cadastroService'
 import type {
   BackendErrorResponse,
   UsuarioCadastroRequest,
+  ConsentimentosVigentesResponse,
 } from '../types/cadastro'
 
 type FeedbackTone = 'info' | 'danger'
 
 const router = useRouter()
+
+const isSuccess = ref(false)
 
 const nome = ref('')
 const email = ref('')
@@ -22,7 +25,7 @@ const telefone = ref('')
 
 const aceitaTermo = ref(false)
 const aceitaPrivacidade = ref(false)
-const aceitaMarketing = ref(false)
+const aceitaMarketing = ref([])
 
 const showTermsDialog = ref(false)
 const showPrivacyDialog = ref(false)
@@ -31,6 +34,8 @@ const isLoading = ref(false)
 
 const feedbackMessage = ref('')
 const feedbackTone = ref<FeedbackTone>('info')
+
+const currentTerms = ref<ConsentimentosVigentesResponse | null>(null)
 
 const errors = ref({
   nome: '',
@@ -100,22 +105,27 @@ function validateForm() {
     isValid = false
   }
 
+  const termsErrors = []
+
   if (!aceitaTermo.value) {
-    setDangerFeedback('Você precisa aceitar o Termo de Uso para continuar.')
+    console.log("Termo de uso não aceito", aceitaTermo.value)
+    termsErrors.push('Você precisa aceitar o(s) Termo(s) de Uso.')
     isValid = false
   }
 
   if (!aceitaPrivacidade.value) {
-    setDangerFeedback('Você precisa confirmar ciência do Aviso de Privacidade.')
+    termsErrors.push('Você precisa confirmar ciência do(s) Aviso(s) de Privacidade.')
     isValid = false
   }
+
+  if (termsErrors.length > 0) {
+    setDangerFeedback(termsErrors.join('\n'))
+  }
+
 
   return isValid
 }
 
-function montarTermsIds() {
-  return []
-}
 
 async function onSubmit() {
   if (!validateForm()) {
@@ -128,7 +138,11 @@ async function onSubmit() {
     nomeCompleto: nome.value.trim(),
     email: email.value.trim(),
     senha: senha.value,
-    termsIds: montarTermsIds(),
+    termsIds: [
+      ...(aceitaTermo.value ? currentTerms.value?.terms.map(clause => clause.documentId) || [] : []),
+      ...(aceitaPrivacidade.value ? currentTerms.value?.privacy.map(clause => clause.documentId) || [] : []),
+      ...aceitaMarketing.value,
+    ],
   }
 
   if (telefone.value.trim()) {
@@ -139,6 +153,7 @@ async function onSubmit() {
     const response = await cadastrarUsuario(payload)
     feedbackTone.value = 'info'
     feedbackMessage.value = response.mensagem
+    isSuccess.value = true
   } catch (error) {
     const backendError = error as Error & BackendErrorResponse
     const status = backendError.status
@@ -162,6 +177,25 @@ async function onSubmit() {
 function goToLogin() {
   router.push('/login')
 }
+
+async function pageRender() {
+  isLoading.value = true
+
+  try {
+    currentTerms.value = await buscarConsentimentosVigentes()
+  } catch (error) {
+    feedbackTone.value = 'danger'
+    feedbackMessage.value = error instanceof Error
+      ? error.message
+      : 'Error loading the page. Please try again'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  pageRender()
+})
 </script>
 
 <template>
@@ -175,70 +209,44 @@ function goToLogin() {
             <span>TECSYS</span>
           </div>
         </div>
-        <span class="topbar-badge">PLATAFORMA ANALITICA</span>
+        <span class="topbar-badge">PLATAFORMA ANALÍTICA</span>
       </div>
     </header>
 
     <main class="login-main spaced">
       <UiCard class="login-card">
         <header class="login-head">
-          <AppHeading
-            eyebrow="Cadastro"
-            title="Solicitar acesso à plataforma"
+          <AppHeading eyebrow="Cadastro" title="Solicitar acesso à plataforma"
             subtitle="Preencha seus dados para solicitar acesso. Seu cadastro será analisado por um administrador."
-            size="lg"
-          />
+            size="lg" />
         </header>
 
-        <form class="login-form" @submit.prevent="onSubmit">
-          <UiAlert v-if="feedbackMessage" :tone="feedbackTone">
-            {{ feedbackMessage }}
-          </UiAlert>
-
+        <form v-if="!isSuccess" class="login-form" @submit.prevent="onSubmit">
           <div class="login-field">
             <UiLabel for="cadastro-nome">Nome completo *</UiLabel>
-            <UiInput
-              id="cadastro-nome"
-              v-model="nome"
-              placeholder="Seu nome completo"
-              :class="{ 'input-error': errors.nome }"
-            />
+            <UiInput id="cadastro-nome" v-model="nome" placeholder="Seu nome completo"
+              :class="{ 'input-error': errors.nome }" />
             <small v-if="errors.nome" class="error-text">{{ errors.nome }}</small>
           </div>
 
           <div class="login-field">
             <UiLabel for="cadastro-email">E-mail *</UiLabel>
-            <UiInput
-              id="cadastro-email"
-              v-model="email"
-              type="email"
-              placeholder="seu.email@empresa.com"
-              :class="{ 'input-error': errors.email }"
-            />
+            <UiInput id="cadastro-email" v-model="email" type="email" placeholder="seu.email@empresa.com"
+              :class="{ 'input-error': errors.email }" />
             <small v-if="errors.email" class="error-text">{{ errors.email }}</small>
           </div>
 
           <div class="login-field">
             <UiLabel for="cadastro-senha">Senha *</UiLabel>
-            <UiInput
-              id="cadastro-senha"
-              v-model="senha"
-              type="password"
-              placeholder="Digite sua senha"
-              :class="{ 'input-error': errors.senha }"
-            />
+            <UiInput id="cadastro-senha" v-model="senha" type="password" placeholder="Digite sua senha"
+              :class="{ 'input-error': errors.senha }" />
             <small v-if="errors.senha" class="error-text">{{ errors.senha }}</small>
           </div>
 
           <div class="login-field">
             <UiLabel for="cadastro-confirmar-senha">Confirmar senha *</UiLabel>
-            <UiInput
-              id="cadastro-confirmar-senha"
-              v-model="confirmarSenha"
-              type="password"
-              placeholder="Confirme sua senha"
-              :class="{ 'input-error': errors.confirmarSenha }"
-            />
+            <UiInput id="cadastro-confirmar-senha" v-model="confirmarSenha" type="password"
+              placeholder="Confirme sua senha" :class="{ 'input-error': errors.confirmarSenha }" />
             <small v-if="errors.confirmarSenha" class="error-text">{{ errors.confirmarSenha }}</small>
           </div>
 
@@ -248,33 +256,37 @@ function goToLogin() {
           </div>
 
           <div class="terms-block">
-            <label class="term-item">
+            <label v-if="currentTerms?.terms" class="term-item">
               <input v-model="aceitaTermo" type="checkbox">
               <span>
-                Li e aceito o Termo de Uso
+                Li e aceito o Termo de Uso *
                 <button type="button" class="term-link" @click="showTermsDialog = true">
                   Visualizar Termo de Uso
                 </button>
               </span>
             </label>
 
-            <label class="term-item">
+            <label v-if="currentTerms?.privacy" class="term-item">
               <input v-model="aceitaPrivacidade" type="checkbox">
               <span>
-                Li o Aviso de Privacidade
+                Li o Aviso de Privacidade *
                 <button type="button" class="term-link" @click="showPrivacyDialog = true">
                   Visualizar Aviso de Privacidade
                 </button>
               </span>
             </label>
 
-            <label class="term-item">
-              <input v-model="aceitaMarketing" type="checkbox">
+            <label v-for="clause in currentTerms?.marketing" class="term-item">
+              <input v-model="aceitaMarketing" :value="clause.documentId" type="checkbox"> 
               <span>
-                Aceito receber comunicações e novidades por e-mail
+                {{ clause.content }}
               </span>
             </label>
           </div>
+
+          <UiAlert v-if="feedbackMessage" :tone="feedbackTone">
+            {{ feedbackMessage }}
+          </UiAlert>
 
           <UiButton class="login-submit" type="submit" :disabled="isSubmitDisabled">
             {{ submitText }}
@@ -289,6 +301,21 @@ function goToLogin() {
             Após o cadastro, sua conta ficará pendente até aprovação administrativa.
           </p>
         </form>
+        <div v-else class="success-state">
+          <UiAlert tone="info">
+            {{ feedbackMessage || 'Cadastro enviado com sucesso!' }}
+          </UiAlert>
+
+          <div class="login-form">
+            <p class="login-info">
+              Seu cadastro foi enviado e está aguardando aprovação.
+            </p>
+          </div>
+
+          <UiButton type="button" @click="goToLogin">
+            Ir para login
+          </UiButton>
+        </div>
       </UiCard>
     </main>
 
@@ -296,21 +323,27 @@ function goToLogin() {
 
     <div v-if="showTermsDialog" class="modal-overlay" @click.self="showTermsDialog = false">
       <div class="modal-card">
-        <h3>Termo de Uso</h3>
-        <p class="doc-version">Versão local</p>
-        <div class="doc-content">Ao solicitar acesso, você confirma que utilizará a plataforma conforme as regras internas da organização e que as informações fornecidas no cadastro são verdadeiras.</div>
+        <h3>Termos de Uso</h3>
+        <div v-for="(clause, i) in currentTerms?.terms" class="document-content doc-content">{{ i + 1 }}. {{
+          clause.content
+        }}</div>
+
         <button type="button" class="modal-close" @click="showTermsDialog = false">Fechar</button>
       </div>
     </div>
 
     <div v-if="showPrivacyDialog" class="modal-overlay" @click.self="showPrivacyDialog = false">
       <div class="modal-card">
-        <h3>Aviso de Privacidade</h3>
-        <p class="doc-version">Versão local</p>
-        <div class="doc-content">Os dados informados no cadastro serão usados para análise de acesso, autenticação e administração da sua conta, conforme necessidade operacional da plataforma.</div>
+        <h3>Termos de Privacidade</h3>
+        <div v-for="(clause, i) in currentTerms?.privacy" class="document-content doc-content">{{ i + 1 }}. {{
+          clause.content
+        }}</div>
+
         <button type="button" class="modal-close" @click="showPrivacyDialog = false">Fechar</button>
       </div>
     </div>
+
+
   </div>
 </template>
 

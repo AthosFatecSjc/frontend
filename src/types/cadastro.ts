@@ -1,15 +1,15 @@
 export interface ConsentimentoDocumento {
   documentId: string
   type: string
-  version: number
+  clause: number
   content: string
   required: boolean
 }
 
-export interface ConsentimentosVigentesResponse {
-  terms: ConsentimentoDocumento
-  privacy: ConsentimentoDocumento
-  marketing: ConsentimentoDocumento | null
+export type ConsentimentosVigentesResponse = {
+  terms: ConsentimentoDocumento[]
+  privacy: ConsentimentoDocumento[]
+  marketing: ConsentimentoDocumento[]
 }
 
 export interface UsuarioCadastroRequest {

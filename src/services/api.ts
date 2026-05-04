@@ -5,7 +5,9 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 type BackendError = {
   status?: number
   code?: string
+  erro?: string
   message?: string
+  mensagem?: string
   error?: string
   severity?: string
   reason?: string | null
@@ -25,10 +27,10 @@ export async function parseApiResponse<T>(response: Response, fallbackMessage: s
       clearAuthSession()
     }
 
-    const error = new Error(errorBody.message ?? errorBody.error ?? fallbackMessage)
+    const error = new Error(errorBody.message ?? errorBody.mensagem ?? errorBody.error ?? fallbackMessage)
     Object.assign(error, {
       status: response.status,
-      code: errorBody.code,
+      code: errorBody.code ?? errorBody.erro,
       reason: errorBody.reason,
     })
     throw error
