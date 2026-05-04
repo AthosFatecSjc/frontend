@@ -26,7 +26,6 @@ const municipiosGeoJson = ref<GeoJSON.FeatureCollection<GeoJSON.Geometry> | null
 const selectedConjuntoId = ref('')
 const loadingMapa = ref(false)
 const loadError = ref('')
-const municipiosWarning = ref('')
 
 const monthLabels = [
   'Janeiro',
@@ -118,19 +117,12 @@ function ensureSelected() {
 }
 
 async function loadMunicipios() {
-  municipiosWarning.value = ''
-
   try {
     const ufs = Array.from(new Set(conjuntos.value.map((item) => item.estado).filter(Boolean)))
     const data = await fetchMunicipiosLayer(ufs)
     municipiosGeoJson.value = data
-
-    if (!data.features.length) {
-      municipiosWarning.value = 'Nao foi possivel carregar a camada municipal no momento.'
-    }
   } catch {
     municipiosGeoJson.value = null
-    municipiosWarning.value = 'Nao foi possivel carregar a camada municipal no momento.'
   }
 }
 
@@ -238,10 +230,6 @@ onMounted(async () => {
   >
     <UiAlert v-if="loadError" tone="danger" class="status-alert">
       {{ loadError }}
-    </UiAlert>
-
-    <UiAlert v-else-if="municipiosWarning" tone="warning" class="status-alert">
-      {{ municipiosWarning }}
     </UiAlert>
 
     <UiCard class="filters-panel">
