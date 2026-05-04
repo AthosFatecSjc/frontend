@@ -11,6 +11,38 @@ const EMPTY_GEOJSON: GeoJSON.FeatureCollection<GeoJSON.Geometry> = {
   features: [],
 }
 
+const MUNICIPIOS_LAYER_TYPE_NAME = 'CCAR:BC250_2025_lml_municipio_a'
+
+const UF_GEOCODIGO_PREFIX: Record<string, string> = {
+  RO: '11',
+  AC: '12',
+  AM: '13',
+  RR: '14',
+  PA: '15',
+  AP: '16',
+  TO: '17',
+  MA: '21',
+  PI: '22',
+  CE: '23',
+  RN: '24',
+  PB: '25',
+  PE: '26',
+  AL: '27',
+  SE: '28',
+  BA: '29',
+  MG: '31',
+  ES: '32',
+  RJ: '33',
+  SP: '35',
+  PR: '41',
+  SC: '42',
+  RS: '43',
+  MS: '50',
+  MT: '51',
+  GO: '52',
+  DF: '53',
+}
+
 type RawIndicador = {
   id?: string
   label?: string
@@ -102,20 +134,32 @@ export async function fetchMapaCalorData(ano?: string): Promise<MapaCalorService
 }
 
 async function fetchMunicipiosByUf(uf: string): Promise<GeoJSON.FeatureCollection<GeoJSON.Geometry>> {
+  const geocodigoPrefix = UF_GEOCODIGO_PREFIX[uf]
+
+  if (!geocodigoPrefix) {
+    return EMPTY_GEOJSON
+  }
+
   const url = new URL('https://geoservicos.ibge.gov.br/geoserver/ows')
   url.searchParams.set('service', 'WFS')
   url.searchParams.set('version', '1.0.0')
   url.searchParams.set('request', 'GetFeature')
-  url.searchParams.set('typeName', 'CGEO:municipio_2022')
+  url.searchParams.set('typeName', MUNICIPIOS_LAYER_TYPE_NAME)
   url.searchParams.set('outputFormat', 'application/json')
-  url.searchParams.set('CQL_FILTER', `sigla_uf='${uf}'`)
+  url.searchParams.set('CQL_FILTER', `geocodigo LIKE '${geocodigoPrefix}%'`)
 
   const response = await fetch(url.toString())
   if (!response.ok) {
     throw new Error(`Falha ao carregar municipios para ${uf}.`)
   }
 
-  return response.json() as Promise<GeoJSON.FeatureCollection<GeoJSON.Geometry>>
+  const payload = await response.json()
+
+  if (payload?.type !== 'FeatureCollection' || !Array.isArray(payload.features)) {
+    throw new Error(`Resposta invalida ao carregar municipios para ${uf}.`)
+  }
+
+  return payload as GeoJSON.FeatureCollection<GeoJSON.Geometry>
 }
 
 export async function fetchMunicipiosLayer(ufs: string[]): Promise<GeoJSON.FeatureCollection<GeoJSON.Geometry>> {

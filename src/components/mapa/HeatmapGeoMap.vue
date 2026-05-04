@@ -66,7 +66,7 @@ function renderMunicipios() {
 
   municipioLayer = L.geoJSON(props.municipiosGeoJson, {
     style: {
-      color: '#b45349',
+      color: '#2563eb',
       weight: 1,
       fillOpacity: 0,
       dashArray: '3 2',
