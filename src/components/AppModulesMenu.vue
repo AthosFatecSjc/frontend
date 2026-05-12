@@ -15,6 +15,7 @@ const route = useRoute()
 const items = [
   { label: 'Minha Conta', to: '/minha-conta', icon: 'user', match: ['/minha-conta'] },
   { label: 'Mapa de Calor', to: '/mapa-calor', icon: 'map', match: ['/mapa-calor'] },
+  { label: 'Teste Login Sharing', to: '/testes/login-sharing', icon: 'share', match: ['/testes/login-sharing'] },
   { label: 'Gestão de Usuários', to: '/admin/usuarios', icon: 'users', match: ['/admin/usuarios'] },
   { label: 'Logs e Auditoria', to: '/admin/logs', icon: 'logs', match: ['/admin/logs'] },
 ]
@@ -22,7 +23,7 @@ const items = [
 const visibleItems = computed(() => items.map(item => ({
   ...item,
   isActive: item.match.some(path => route.path.startsWith(path)),
-})).filter((item) => item.to === '/minha-conta' || item.to === '/mapa-calor' || hasAdminAccess()))
+})).filter((item) => item.to === '/minha-conta' || item.to === '/mapa-calor' || item.to === '/testes/login-sharing' || hasAdminAccess()))
 </script>
 
 <template>
@@ -72,6 +73,40 @@ const visibleItems = computed(() => items.map(item => ({
               />
               <path
                 d="M14 3v6h6M11 13h6M11 17h6"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+            </template>
+            <template v-else-if="item.icon === 'share'">
+              <circle
+                cx="6.5"
+                cy="12"
+                r="2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+              />
+              <circle
+                cx="16.5"
+                cy="6"
+                r="2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+              />
+              <circle
+                cx="16.5"
+                cy="18"
+                r="2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+              />
+              <path
+                d="M8.2 11.1 14.8 7M8.2 12.9 14.8 17"
                 fill="none"
                 stroke="currentColor"
                 stroke-linecap="round"

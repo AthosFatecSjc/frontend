@@ -53,6 +53,11 @@ const router = createRouter({
       component: () => import('../pages/MinhaConta.vue'),
     },
     {
+      path: '/testes/login-sharing',
+      name: 'LoginSharingTest',
+      component: () => import('../pages/LoginSharingTest.vue'),
+    },
+    {
       path: '/admin/logs',
       name: 'AdminLogs',
       component: () => import('../pages/AdminLogs.vue'),
