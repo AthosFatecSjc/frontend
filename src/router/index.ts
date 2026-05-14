@@ -58,6 +58,14 @@ const router = createRouter({
       component: () => import('../pages/LoginSharingTest.vue'),
     },
     {
+      path: '/testes/login-sharing/consent',
+      name: 'LoginSharingConsentPopup',
+      component: () => import('../pages/LoginSharingConsentPopup.vue'),
+      meta: {
+        whitelistRequiredTermsAcceptance: true,
+      },
+    },
+    {
       path: '/admin/logs',
       name: 'AdminLogs',
       component: () => import('../pages/AdminLogs.vue'),

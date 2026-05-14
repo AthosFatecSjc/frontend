@@ -1,18 +1,13 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import {
   createLoginSharingRequest,
-  getLoginSharingConsent,
-  getLoginSharingHistory,
-  getLoginSharingUserData,
-  getPendingLoginSharingRequests,
-  respondLoginSharingRequest,
 } from '@/services/loginSharingService'
 import type {
   CreateLoginSharingRequestPayload,
   LoginSharingRequest,
-  LoginSharingResponsePayload,
   LoginSharingStatus,
   SharedUserDataResponse,
 } from '@/types/loginSharing'
@@ -25,12 +20,11 @@ type ApiError = {
 
 const loadingState = reactive({
   creating: false,
-  pending: false,
-  consent: false,
-  responding: false,
-  userData: false,
-  history: false,
+  opening: false,
 })
+
+const router = useRouter()
+const CONSENT_RESULT_KEY = 'login-sharing-consent-result'
 
 const createForm = reactive<CreateLoginSharingRequestPayload>({
   externalAgentName: 'Facebook',
@@ -38,25 +32,37 @@ const createForm = reactive<CreateLoginSharingRequestPayload>({
   userEmail: '',
 })
 
-const userAccess = reactive({
-  requestId: '',
-})
-
-const responseForm = reactive<LoginSharingResponsePayload>({
-  approved: true,
-  reason: 'I trust this external agent with my login data',
-})
-
 const statusMessage = ref('')
 const apiError = ref<ApiError | null>(null)
 
 const createdRequest = ref<LoginSharingRequest | null>(null)
-const consentDetails = ref<LoginSharingRequest | null>(null)
-const userDataResponse = ref<SharedUserDataResponse | null>(null)
-const pendingRequests = ref<LoginSharingRequest[]>([])
-const historyRequests = ref<LoginSharingRequest[]>([])
+const sharedDataResult = ref<SharedUserDataResponse | null>(null)
+const decisionResult = ref<{
+  requestId: string
+  externalAgentName: string
+  status: LoginSharingStatus
+  requestedAt: string
+  expiresAt: string
+  respondedAt: string
+  reason: string | null
+} | null>(null)
 
-const canUseRequestIdActions = computed(() => userAccess.requestId.trim().length > 0)
+const canOpenConsent = computed(() => Boolean(createdRequest.value))
+
+const MESSAGE_TYPE = 'login-sharing-consent-result'
+
+type LoginSharingConsentResultMessage = {
+  type: typeof MESSAGE_TYPE
+  payload: {
+    requestId: string
+    externalAgentName: string
+    status: LoginSharingStatus
+    approved: boolean
+    reason: string | null
+    data: SharedUserDataResponse | null
+    respondedAt: string
+  }
+}
 
 function toApiError(error: unknown): ApiError {
   if (error instanceof Error) {
@@ -82,10 +88,6 @@ function toApiError(error: unknown): ApiError {
 function clearAlerts() {
   statusMessage.value = ''
   apiError.value = null
-}
-
-function setRequestId(value: string) {
-  userAccess.requestId = value
 }
 
 function formatDateTime(value: string | null) {
@@ -119,6 +121,68 @@ function toPrettyJson(value: unknown) {
   return JSON.stringify(value, null, 2)
 }
 
+function applyConsentResult(message: LoginSharingConsentResultMessage) {
+  decisionResult.value = {
+    requestId: message.payload.requestId,
+    externalAgentName: message.payload.externalAgentName,
+    status: message.payload.status,
+    requestedAt: createdRequest.value?.requestedAt ?? message.payload.respondedAt,
+    expiresAt: createdRequest.value?.expiresAt ?? message.payload.respondedAt,
+    respondedAt: message.payload.respondedAt,
+    reason: message.payload.reason,
+  }
+
+  sharedDataResult.value = message.payload.data
+
+  if (createdRequest.value) {
+    createdRequest.value = {
+      ...createdRequest.value,
+      status: message.payload.status,
+      respondedAt: message.payload.respondedAt,
+      reason: message.payload.reason,
+    }
+  }
+
+}
+
+function handleWindowMessage(event: MessageEvent) {
+  if (event.origin !== window.location.origin) return
+
+  const data = event.data as LoginSharingConsentResultMessage | undefined
+
+  if (!data || data.type !== MESSAGE_TYPE) return
+
+  try {
+    applyConsentResult(data)
+  } catch (err) {
+    console.error('[login-sharing] applyConsentResult failed', err, data)
+    apiError.value = toApiError(err)
+  }
+}
+
+function handleStorageEvent(event: StorageEvent) {
+  if (event.key !== CONSENT_RESULT_KEY || !event.newValue) return
+
+  try {
+    const data = JSON.parse(event.newValue) as LoginSharingConsentResultMessage
+    if (data.type === MESSAGE_TYPE) {
+      applyConsentResult(data)
+    }
+  } catch {
+    // ignore malformed fallback messages
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('message', handleWindowMessage)
+  window.addEventListener('storage', handleStorageEvent)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('message', handleWindowMessage)
+  window.removeEventListener('storage', handleStorageEvent)
+})
+
 async function handleCreateRequest() {
   clearAlerts()
   loadingState.creating = true
@@ -130,10 +194,10 @@ async function handleCreateRequest() {
       userEmail: createForm.userEmail.trim(),
     }
 
-    const response = await createLoginSharingRequest(payload)
-    createdRequest.value = response
-    setRequestId(response.requestId)
-    statusMessage.value = `Solicitacao criada com sucesso. Request ID: ${response.requestId}`
+    createdRequest.value = await createLoginSharingRequest(payload)
+    sharedDataResult.value = null
+    decisionResult.value = null
+    statusMessage.value = `Solicitação criada com sucesso. Request ID: ${createdRequest.value.requestId}`
   } catch (error) {
     apiError.value = toApiError(error)
   } finally {
@@ -141,117 +205,67 @@ async function handleCreateRequest() {
   }
 }
 
-async function handleLoadPending() {
-  clearAlerts()
-  loadingState.pending = true
-
-  try {
-    pendingRequests.value = await getPendingLoginSharingRequests()
-    statusMessage.value = `Pendencias carregadas: ${pendingRequests.value.length}`
-  } catch (error) {
-    apiError.value = toApiError(error)
-  } finally {
-    loadingState.pending = false
-  }
-}
-
-async function handleLoadConsent() {
-  if (!canUseRequestIdActions.value) return
+async function handleOpenConsentPopup() {
+  if (!createdRequest.value) return
 
   clearAlerts()
-  loadingState.consent = true
+  loadingState.opening = true
 
   try {
-    consentDetails.value = await getLoginSharingConsent(userAccess.requestId.trim())
-    statusMessage.value = 'Detalhes da solicitacao carregados com sucesso.'
-  } catch (error) {
-    apiError.value = toApiError(error)
-  } finally {
-    loadingState.consent = false
-  }
-}
-
-async function handleRespond() {
-  if (!canUseRequestIdActions.value) return
-
-  clearAlerts()
-  loadingState.responding = true
-
-  try {
-    consentDetails.value = await respondLoginSharingRequest(
-      userAccess.requestId.trim(),
-      {
-        approved: responseForm.approved,
-        reason: responseForm.reason.trim(),
+    const { requestId, externalAgentName, externalAgentEmail } = createdRequest.value
+    const consentUrl = router.resolve({
+      name: 'LoginSharingConsentPopup',
+      query: {
+        requestId,
+        userEmail: createForm.userEmail.trim(),
+        externalAgentName,
+        externalAgentEmail,
       },
+    }).href
+
+    const popup = window.open(
+      consentUrl,
+      'login-sharing-consent-popup',
+      'width=980,height=860',
     )
-    statusMessage.value = responseForm.approved
-      ? 'Solicitacao aprovada com sucesso.'
-      : 'Solicitacao rejeitada com sucesso.'
 
-    await handleLoadPending()
+    if (!popup) {
+      throw new Error('Nao foi possivel abrir o pop-up de consentimento.')
+    }
+
+    statusMessage.value = 'Pop-up de consentimento aberto em nova janela.'
   } catch (error) {
     apiError.value = toApiError(error)
   } finally {
-    loadingState.responding = false
-  }
-}
-
-async function handleFetchUserData() {
-  if (!canUseRequestIdActions.value) return
-
-  clearAlerts()
-  loadingState.userData = true
-
-  try {
-    userDataResponse.value = await getLoginSharingUserData(userAccess.requestId.trim())
-    statusMessage.value = 'Dados compartilhados recuperados com sucesso.'
-  } catch (error) {
-    apiError.value = toApiError(error)
-  } finally {
-    loadingState.userData = false
-  }
-}
-
-async function handleLoadHistory() {
-  clearAlerts()
-  loadingState.history = true
-
-  try {
-    historyRequests.value = await getLoginSharingHistory()
-    statusMessage.value = `Historico carregado: ${historyRequests.value.length} registro(s).`
-  } catch (error) {
-    apiError.value = toApiError(error)
-  } finally {
-    loadingState.history = false
+    loadingState.opening = false
   }
 }
 </script>
 
 <template>
   <AuthenticatedLayout
-    title="Login Sharing API"
-    description="Tela de testes para simular o fluxo OAuth-like entre agente externo, consentimento do usuario e compartilhamento de dados."
-    user-name="Usuário interno"
-    role-label="Plataforma"
+    title="Aplicação externa"
+    description="Esta tela simula uma aplicação OAuth2-like que solicita acesso aos dados do usuário. O consentimento acontece em um pop-up dentro da mesma experiência."
+    user-name="Aplicação externa"
+    role-label="Solicitante"
   >
-    <div class="grid-layout">
+    <div class="page-grid">
       <UiCard>
         <div class="card-block">
-          <p class="section-eyebrow">1. Agente Externo</p>
+          <p class="section-eyebrow">1. Solicitação</p>
           <h2 class="section-title">Criar solicitação de login-sharing</h2>
           <p class="section-description">
-            Simula o endpoint público <strong>POST /usuarios/login-sharing/request</strong> sem autenticação.
+            Primeiro a aplicação externa cria a solicitação. Depois, ao clicar em <strong>Solicitar dados</strong>, a janela de consentimento da nossa aplicação é aberta em outra aba/janela.
           </p>
 
           <div class="form-grid">
             <div class="field">
-              <UiLabel>Nome do agente externo</UiLabel>
+              <UiLabel>Nome da aplicação</UiLabel>
               <UiInput v-model="createForm.externalAgentName" placeholder="Facebook" />
             </div>
 
             <div class="field">
-              <UiLabel>E-mail do agente externo</UiLabel>
+              <UiLabel>E-mail da aplicação</UiLabel>
               <UiInput v-model="createForm.externalAgentEmail" placeholder="oauth@facebook.com" />
             </div>
 
@@ -265,14 +279,16 @@ async function handleLoadHistory() {
             <UiButton :disabled="loadingState.creating" @click="handleCreateRequest">
               {{ loadingState.creating ? 'Criando...' : 'Criar solicitação' }}
             </UiButton>
+
+            <UiButton :disabled="loadingState.opening || !canOpenConsent" @click="handleOpenConsentPopup">
+              {{ loadingState.opening ? 'Abrindo...' : 'Solicitar dados' }}
+            </UiButton>
           </div>
 
           <div v-if="createdRequest" class="result-box">
             <div class="result-box__header">
               <UiBadge :tone="statusTone(createdRequest.status)">{{ statusLabel(createdRequest.status) }}</UiBadge>
-              <button type="button" class="link-button" @click="setRequestId(createdRequest.requestId)">
-                usar requestId no fluxo
-              </button>
+              <span class="meta-inline">Request ID: {{ createdRequest.requestId }}</span>
             </div>
             <pre>{{ toPrettyJson(createdRequest) }}</pre>
           </div>
@@ -281,99 +297,36 @@ async function handleLoadHistory() {
 
       <UiCard>
         <div class="card-block">
-          <p class="section-eyebrow">2. Usuário</p>
-          <h2 class="section-title">Request ID</h2>
-          <div class="form-grid">
-            <div class="field field--full">
-              <UiLabel>Request ID alvo</UiLabel>
-              <UiInput v-model="userAccess.requestId" placeholder="550e8400-e29b-41d4-a716-446655440000" />
+          <p class="section-eyebrow">2. Resultado</p>
+          <h2 class="section-title">Status e dados retornados</h2>
+
+          <div v-if="decisionResult" class="result-box">
+            <div class="result-box__header">
+              <UiBadge :tone="statusTone(decisionResult.status)">{{ statusLabel(decisionResult.status) }}</UiBadge>
+              <span class="meta-inline">Respondida em {{ formatDateTime(decisionResult.respondedAt) }}</span>
+            </div>
+
+            <p class="request-item__meta">
+              Aplicação: {{ decisionResult.externalAgentName }}<br />
+              E-mail: {{ createdRequest?.externalAgentEmail }}
+            </p>
+
+            <div v-if="sharedDataResult">
+              <p class="request-item__meta">Dados enviados para a aplicação:</p>
+              <pre>{{ toPrettyJson(sharedDataResult) }}</pre>
+            </div>
+
+            <div v-else>
+              <p class="request-item__meta">Acesso rejeitado.</p>
+              <p v-if="decisionResult.reason" class="request-item__meta">
+                Motivo: {{ decisionResult.reason }}
+              </p>
             </div>
           </div>
 
-          <div class="actions actions--split">
-            <UiButton variant="secondary" :disabled="loadingState.pending" @click="handleLoadPending">
-              {{ loadingState.pending ? 'Carregando...' : 'GET /pending' }}
-            </UiButton>
-            <UiButton variant="secondary" :disabled="loadingState.history" @click="handleLoadHistory">
-              {{ loadingState.history ? 'Carregando...' : 'GET /history' }}
-            </UiButton>
-          </div>
-
-          <div v-if="pendingRequests.length" class="list-box">
-            <h3 class="list-title">Pendentes</h3>
-            <ul class="request-list">
-              <li v-for="request in pendingRequests" :key="request.requestId" class="request-item">
-                <div class="request-item__head">
-                  <strong>{{ request.externalAgentName }}</strong>
-                  <UiBadge :tone="statusTone(request.status)">{{ statusLabel(request.status) }}</UiBadge>
-                </div>
-                <p class="request-item__meta">{{ request.externalAgentEmail }}</p>
-                <p class="request-item__meta">expira em {{ formatDateTime(request.expiresAt) }}</p>
-                <button type="button" class="link-button" @click="setRequestId(request.requestId)">
-                  usar {{ request.requestId }}
-                </button>
-              </li>
-            </ul>
-          </div>
-
-          <div v-if="historyRequests.length" class="result-box">
-            <h3 class="list-title">Histórico</h3>
-            <pre>{{ toPrettyJson(historyRequests) }}</pre>
-          </div>
-        </div>
-      </UiCard>
-
-      <UiCard>
-        <div class="card-block">
-          <p class="section-eyebrow">3. Consentimento</p>
-          <h2 class="section-title">Detalhar e responder solicitação</h2>
-
-          <div class="actions actions--split">
-            <UiButton
-              variant="secondary"
-              :disabled="loadingState.consent || !canUseRequestIdActions"
-              @click="handleLoadConsent"
-            >
-              {{ loadingState.consent ? 'Consultando...' : 'GET /{requestId}/consent' }}
-            </UiButton>
-            <UiButton
-              variant="secondary"
-              :disabled="loadingState.userData || !canUseRequestIdActions"
-              @click="handleFetchUserData"
-            >
-              {{ loadingState.userData ? 'Buscando...' : 'GET /{requestId}/user-data' }}
-            </UiButton>
-          </div>
-
-          <div class="response-box">
-            <UiLabel>Resposta do usuário</UiLabel>
-            <div class="radio-group">
-              <label class="radio-item">
-                <input v-model="responseForm.approved" type="radio" :value="true" />
-                Aprovar
-              </label>
-              <label class="radio-item">
-                <input v-model="responseForm.approved" type="radio" :value="false" />
-                Rejeitar
-              </label>
-            </div>
-            <UiInput v-model="responseForm.reason" placeholder="Motivo da aprovação/rejeição" />
-            <UiButton
-              :disabled="loadingState.responding || !canUseRequestIdActions"
-              @click="handleRespond"
-            >
-              {{ loadingState.responding ? 'Enviando...' : 'POST /{requestId}/respond' }}
-            </UiButton>
-          </div>
-
-          <div v-if="consentDetails" class="result-box">
-            <h3 class="list-title">Detalhes da solicitação</h3>
-            <pre>{{ toPrettyJson(consentDetails) }}</pre>
-          </div>
-
-          <div v-if="userDataResponse" class="result-box">
-            <h3 class="list-title">Dados compartilhados</h3>
-            <pre>{{ toPrettyJson(userDataResponse) }}</pre>
+          <div v-else class="empty-state">
+            <p>Nenhuma resposta foi concluída ainda.</p>
+            <p>Após aprovar ou negar no pop-up, o status e os dados aparecem aqui.</p>
           </div>
         </div>
       </UiCard>
@@ -389,7 +342,7 @@ async function handleLoadHistory() {
 </template>
 
 <style scoped>
-.grid-layout {
+.page-grid {
   display: grid;
   gap: 1rem;
 }
@@ -434,19 +387,9 @@ async function handleLoadHistory() {
   grid-column: 1 / -1;
 }
 
-.field-hint {
-  color: #64748b;
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
-}
-
 .actions {
   display: grid;
   gap: 0.65rem;
-}
-
-.actions--split {
-  grid-template-columns: repeat(1, minmax(0, 1fr));
 }
 
 .result-box {
@@ -456,7 +399,8 @@ async function handleLoadHistory() {
   background: #f8fbff;
 }
 
-.result-box pre {
+.result-box pre,
+.modal-panel pre {
   margin: 0;
   overflow: auto;
   font-size: 0.78rem;
@@ -471,39 +415,10 @@ async function handleLoadHistory() {
   margin-bottom: 0.55rem;
 }
 
-.list-box {
-  border: 1px solid #dbeafe;
-  border-radius: 0.8rem;
-  padding: 0.85rem;
-  background: #f8fbff;
-}
-
 .list-title {
   margin: 0 0 0.65rem;
   color: #1e293b;
   font-size: 0.92rem;
-}
-
-.request-list {
-  display: grid;
-  gap: 0.6rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.request-item {
-  border: 1px solid #e2e8f0;
-  border-radius: 0.72rem;
-  background: #fff;
-  padding: 0.7rem;
-}
-
-.request-item__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.75rem;
 }
 
 .request-item__meta {
@@ -512,27 +427,17 @@ async function handleLoadHistory() {
   color: #5f7387;
 }
 
-.response-box {
-  display: grid;
-  gap: 0.6rem;
-  border: 1px dashed #bfdbfe;
+.meta-inline {
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.empty-state {
+  border: 1px dashed #cbd5e1;
   border-radius: 0.8rem;
-  padding: 0.8rem;
-  background: #f9fcff;
-}
-
-.radio-group {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.9rem;
-}
-
-.radio-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  color: #334155;
-  font-size: 0.9rem;
+  background: #f8fafc;
+  color: #475569;
+  padding: 0.85rem;
 }
 
 .link-button {
@@ -550,17 +455,13 @@ async function handleLoadHistory() {
   margin-top: 1rem;
 }
 
-@media (min-width: 1100px) {
-  .grid-layout {
+@media (min-width: 900px) {
+  .page-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .grid-layout > :last-child {
+  .page-grid > :last-child {
     grid-column: 1 / -1;
-  }
-
-  .actions--split {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>
