@@ -17,12 +17,13 @@ const items = [
   { label: 'Mapa de Calor', to: '/mapa-calor', icon: 'map', match: ['/mapa-calor'] },
   { label: 'Gestão de Usuários', to: '/admin/usuarios', icon: 'users', match: ['/admin/usuarios'] },
   { label: 'Logs e Auditoria', to: '/admin/logs', icon: 'logs', match: ['/admin/logs'] },
+  { label: 'Administrar Termos', to: '/admin-terms', icon: 'terms', match: ['/admin-terms'] },
 ]
 
 const visibleItems = computed(() => items.map(item => ({
   ...item,
   isActive: item.match.some(path => route.path.startsWith(path)),
-})).filter((item) => item.to === '/minha-conta' || item.to === '/mapa-calor' || hasAdminAccess()))
+})).filter((item) => item.to === '/minha-conta' || item.to === '/mapa-calor' || item.to === '/admin-terms' || hasAdminAccess()))
 </script>
 
 <template>
@@ -33,87 +34,43 @@ const visibleItems = computed(() => items.map(item => ({
     </div>
 
     <div class="modules-menu__items">
-      <RouterLink
-        v-for="item in visibleItems"
-        :key="item.to"
-        :to="item.to"
-        class="modules-menu__item"
+      <RouterLink v-for="item in visibleItems" :key="item.to" :to="item.to" class="modules-menu__item"
         :class="{ 'modules-menu__item--active': item.isActive, 'modules-menu__item--collapsed': props.collapsed }"
-        :title="props.collapsed ? item.label : undefined"
-      >
+        :title="props.collapsed ? item.label : undefined">
         <span class="modules-menu__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" class="modules-menu__svg">
             <template v-if="item.icon === 'map'">
-              <path
-                d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2Z"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.7"
-              />
-              <path
-                d="M9 4v14M15 6v14"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.7"
-              />
+              <path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2Z" fill="none" stroke="currentColor" stroke-linecap="round"
+                stroke-linejoin="round" stroke-width="1.7" />
+              <path d="M9 4v14M15 6v14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                stroke-width="1.7" />
             </template>
             <template v-else-if="item.icon === 'logs'">
-              <path
-                d="M14 3h-4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9Z"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.7"
-              />
-              <path
-                d="M14 3v6h6M11 13h6M11 17h6"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.7"
-              />
+              <path d="M14 3h-4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9Z" fill="none" stroke="currentColor"
+                stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+              <path d="M14 3v6h6M11 13h6M11 17h6" fill="none" stroke="currentColor" stroke-linecap="round"
+                stroke-linejoin="round" stroke-width="1.7" />
             </template>
             <template v-else-if="item.icon === 'users'">
               <path
                 d="M9.5 12.25a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.25 0a2.75 2.75 0 1 0-2.75-2.75 2.75 2.75 0 0 0 2.75 2.75ZM4.5 19.5a5 5 0 0 1 10 0"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.7"
-              />
+                fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+              <path d="M14.75 19.5a4.25 4.25 0 0 0-8.5 0" fill="none" stroke="currentColor" stroke-linecap="round"
+                stroke-linejoin="round" stroke-width="1.7" />
+            </template>
+            <template v-else-if="item.icon === 'terms'">
               <path
-                d="M14.75 19.5a4.25 4.25 0 0 0-8.5 0"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.7"
-              />
+                d="M7 4.75A1.75 1.75 0 0 1 8.75 3h4.5A1.75 1.75 0 0 1 15 4.75V6h1.25A1.75 1.75 0 0 1 18 7.75v8.5A1.75 1.75 0 0 1 16.25 18H7.75A1.75 1.75 0 0 1 6 16.25v-8.5A1.75 1.75 0 0 1 7.75 6H9V4.75Z"
+                fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+              <path d="M9.5 8.25h5M9.5 11h5M9.5 13.75h3" fill="none" stroke="currentColor" stroke-linecap="round"
+                stroke-linejoin="round" stroke-width="1.7" />
+              <path d="M10.75 3v3M13.25 3v3" fill="none" stroke="currentColor" stroke-linecap="round"
+                stroke-linejoin="round" stroke-width="1.7" />
             </template>
             <template v-else>
-              <path
-                d="M7.75 18.25a4.25 4.25 0 0 1 8.5 0M15.75 8.75A3.75 3.75 0 1 1 12 5a3.75 3.75 0 0 1 3.75 3.75Z"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.7"
-              />
-              <circle
-                cx="12"
-                cy="12"
-                r="9"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.7"
-              />
+              <path d="M7.75 18.25a4.25 4.25 0 0 1 8.5 0M15.75 8.75A3.75 3.75 0 1 1 12 5a3.75 3.75 0 0 1 3.75 3.75Z"
+                fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7" />
             </template>
           </svg>
         </span>
