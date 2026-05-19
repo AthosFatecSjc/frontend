@@ -101,3 +101,17 @@ export async function getLoginSharingHistory(tokenOverride?: string) {
     'Nao foi possivel carregar o historico de compartilhamentos.',
   )
 }
+
+export async function revokeLoginSharingRequest(requestId: string, tokenOverride?: string) {
+  const response = await fetch(
+    `${API_URL}/${requestId}/revoke`,
+    createUserAuthRequest(tokenOverride, {
+      method: 'POST',
+    }),
+  )
+
+  return parseApiResponse<LoginSharingRequest>(
+    response,
+    'Nao foi possivel revogar a solicitacao.',
+  )
+}

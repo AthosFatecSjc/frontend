@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, reactive, ref } from 'vue'
 
 import {
-  createLoginSharingRequest,
+  getLoginSharingHistory,
+  revokeLoginSharingRequest,
 } from '@/services/loginSharingService'
 import type {
-  CreateLoginSharingRequestPayload,
   LoginSharingRequest,
   LoginSharingStatus,
-  SharedUserDataResponse,
 } from '@/types/loginSharing'
 
 type ApiError = {
@@ -18,51 +16,16 @@ type ApiError = {
   code?: string
 }
 
-const loadingState = reactive({
-  creating: false,
-  opening: false,
-})
-
-const router = useRouter()
-const CONSENT_RESULT_KEY = 'login-sharing-consent-result'
-
-const createForm = reactive<CreateLoginSharingRequestPayload>({
-  externalAgentName: 'Facebook',
-  externalAgentEmail: 'oauth@facebook.com',
-  userEmail: '',
-})
+const loadingHistory = ref(false)
+const revokingRequestId = ref<string | null>(null)
+const requestHistory = ref<LoginSharingRequest[]>([])
 
 const statusMessage = ref('')
 const apiError = ref<ApiError | null>(null)
 
-const createdRequest = ref<LoginSharingRequest | null>(null)
-const sharedDataResult = ref<SharedUserDataResponse | null>(null)
-const decisionResult = ref<{
-  requestId: string
-  externalAgentName: string
-  status: LoginSharingStatus
-  requestedAt: string
-  expiresAt: string
-  respondedAt: string
-  reason: string | null
-} | null>(null)
-
-const canOpenConsent = computed(() => Boolean(createdRequest.value))
-
-const MESSAGE_TYPE = 'login-sharing-consent-result'
-
-type LoginSharingConsentResultMessage = {
-  type: typeof MESSAGE_TYPE
-  payload: {
-    requestId: string
-    externalAgentName: string
-    status: LoginSharingStatus
-    approved: boolean
-    reason: string | null
-    data: SharedUserDataResponse | null
-    respondedAt: string
-  }
-}
+const refreshState = reactive({
+  lastLoadedAt: '' as string,
+})
 
 function toApiError(error: unknown): ApiError {
   if (error instanceof Error) {
@@ -73,16 +36,10 @@ function toApiError(error: unknown): ApiError {
       ? String((error as { code?: string }).code)
       : undefined
 
-    return {
-      message: error.message,
-      status,
-      code,
-    }
+    return { message: error.message, status, code }
   }
 
-  return {
-    message: 'Erro inesperado ao executar a operacao.',
-  }
+  return { message: 'Erro inesperado ao executar a operacao.' }
 }
 
 function clearAlerts() {
@@ -121,212 +78,124 @@ function toPrettyJson(value: unknown) {
   return JSON.stringify(value, null, 2)
 }
 
-function applyConsentResult(message: LoginSharingConsentResultMessage) {
-  decisionResult.value = {
-    requestId: message.payload.requestId,
-    externalAgentName: message.payload.externalAgentName,
-    status: message.payload.status,
-    requestedAt: createdRequest.value?.requestedAt ?? message.payload.respondedAt,
-    expiresAt: createdRequest.value?.expiresAt ?? message.payload.respondedAt,
-    respondedAt: message.payload.respondedAt,
-    reason: message.payload.reason,
-  }
-
-  sharedDataResult.value = message.payload.data
-
-  if (createdRequest.value) {
-    createdRequest.value = {
-      ...createdRequest.value,
-      status: message.payload.status,
-      respondedAt: message.payload.respondedAt,
-      reason: message.payload.reason,
-    }
-  }
-
-}
-
-function handleWindowMessage(event: MessageEvent) {
-  if (event.origin !== window.location.origin) return
-
-  const data = event.data as LoginSharingConsentResultMessage | undefined
-
-  if (!data || data.type !== MESSAGE_TYPE) return
+async function loadHistory() {
+  clearAlerts()
+  loadingHistory.value = true
 
   try {
-    applyConsentResult(data)
-  } catch (err) {
-    console.error('[login-sharing] applyConsentResult failed', err, data)
-    apiError.value = toApiError(err)
+    requestHistory.value = await getLoginSharingHistory()
+    refreshState.lastLoadedAt = new Date().toISOString()
+    statusMessage.value = `Histórico carregado. Total: ${requestHistory.value.length} solicitações.`
+  } catch (error) {
+    apiError.value = toApiError(error)
+  } finally {
+    loadingHistory.value = false
   }
 }
 
-function handleStorageEvent(event: StorageEvent) {
-  if (event.key !== CONSENT_RESULT_KEY || !event.newValue) return
+async function handleRevoke(requestId: string) {
+  clearAlerts()
+  revokingRequestId.value = requestId
 
   try {
-    const data = JSON.parse(event.newValue) as LoginSharingConsentResultMessage
-    if (data.type === MESSAGE_TYPE) {
-      applyConsentResult(data)
-    }
-  } catch {
-    // ignore malformed fallback messages
+    await revokeLoginSharingRequest(requestId)
+    statusMessage.value = 'Solicitação revogada com sucesso.'
+    await loadHistory()
+  } catch (error) {
+    apiError.value = toApiError(error)
+  } finally {
+    revokingRequestId.value = null
   }
 }
 
 onMounted(() => {
-  window.addEventListener('message', handleWindowMessage)
-  window.addEventListener('storage', handleStorageEvent)
+  loadHistory()
 })
-
-onBeforeUnmount(() => {
-  window.removeEventListener('message', handleWindowMessage)
-  window.removeEventListener('storage', handleStorageEvent)
-})
-
-async function handleCreateRequest() {
-  clearAlerts()
-  loadingState.creating = true
-
-  try {
-    const payload = {
-      externalAgentName: createForm.externalAgentName.trim(),
-      externalAgentEmail: createForm.externalAgentEmail.trim(),
-      userEmail: createForm.userEmail.trim(),
-    }
-
-    createdRequest.value = await createLoginSharingRequest(payload)
-    sharedDataResult.value = null
-    decisionResult.value = null
-    statusMessage.value = `Solicitação criada com sucesso. Request ID: ${createdRequest.value.requestId}`
-  } catch (error) {
-    apiError.value = toApiError(error)
-  } finally {
-    loadingState.creating = false
-  }
-}
-
-async function handleOpenConsentPopup() {
-  if (!createdRequest.value) return
-
-  clearAlerts()
-  loadingState.opening = true
-
-  try {
-    const { requestId, externalAgentName, externalAgentEmail } = createdRequest.value
-    const consentUrl = router.resolve({
-      name: 'LoginSharingConsentPopup',
-      query: {
-        requestId,
-        userEmail: createForm.userEmail.trim(),
-        externalAgentName,
-        externalAgentEmail,
-      },
-    }).href
-
-    const popup = window.open(
-      consentUrl,
-      'login-sharing-consent-popup',
-      'width=980,height=860',
-    )
-
-    if (!popup) {
-      throw new Error('Nao foi possivel abrir o pop-up de consentimento.')
-    }
-
-    statusMessage.value = 'Pop-up de consentimento aberto em nova janela.'
-  } catch (error) {
-    apiError.value = toApiError(error)
-  } finally {
-    loadingState.opening = false
-  }
-}
 </script>
 
 <template>
   <AuthenticatedLayout
-    title="Aplicação externa"
-    description="Esta tela simula uma aplicação OAuth2-like que solicita acesso aos dados do usuário. O consentimento acontece em um pop-up dentro da mesma experiência."
-    user-name="Aplicação externa"
-    role-label="Solicitante"
+    title="Painel interno"
+    description="Este painel não cria solicitações. Ele apenas gerencia o histórico de login-sharing e permite revogar acessos já aprovados. A aplicação externa foi movida para uma app separada."
+    user-name="Aplicação interna"
+    role-label="Gestão"
   >
     <div class="page-grid">
       <UiCard>
         <div class="card-block">
-          <p class="section-eyebrow">1. Solicitação</p>
-          <h2 class="section-title">Criar solicitação de login-sharing</h2>
+          <p class="section-eyebrow">Solicitações</p>
+          <h2 class="section-title">Histórico e revogação</h2>
           <p class="section-description">
-            Primeiro a aplicação externa cria a solicitação. Depois, ao clicar em <strong>Solicitar dados</strong>, a janela de consentimento da nossa aplicação é aberta em outra aba/janela.
+            Aqui ficam somente o acompanhamento das solicitações e a revogação de acessos já aprovados.
           </p>
 
-          <div class="form-grid">
-            <div class="field">
-              <UiLabel>Nome da aplicação</UiLabel>
-              <UiInput v-model="createForm.externalAgentName" placeholder="Facebook" />
-            </div>
-
-            <div class="field">
-              <UiLabel>E-mail da aplicação</UiLabel>
-              <UiInput v-model="createForm.externalAgentEmail" placeholder="oauth@facebook.com" />
-            </div>
-
-            <div class="field field--full">
-              <UiLabel>E-mail do usuário alvo</UiLabel>
-              <UiInput v-model="createForm.userEmail" placeholder="user@example.com" />
-            </div>
-          </div>
-
           <div class="actions">
-            <UiButton :disabled="loadingState.creating" @click="handleCreateRequest">
-              {{ loadingState.creating ? 'Criando...' : 'Criar solicitação' }}
-            </UiButton>
-
-            <UiButton :disabled="loadingState.opening || !canOpenConsent" @click="handleOpenConsentPopup">
-              {{ loadingState.opening ? 'Abrindo...' : 'Solicitar dados' }}
+            <UiButton :disabled="loadingHistory" @click="loadHistory">
+              {{ loadingHistory ? 'Atualizando...' : 'Atualizar histórico' }}
             </UiButton>
           </div>
 
-          <div v-if="createdRequest" class="result-box">
-            <div class="result-box__header">
-              <UiBadge :tone="statusTone(createdRequest.status)">{{ statusLabel(createdRequest.status) }}</UiBadge>
-              <span class="meta-inline">Request ID: {{ createdRequest.requestId }}</span>
-            </div>
-            <pre>{{ toPrettyJson(createdRequest) }}</pre>
+          <div v-if="refreshState.lastLoadedAt" class="meta-inline">
+            Última atualização: {{ formatDateTime(refreshState.lastLoadedAt) }}
           </div>
         </div>
       </UiCard>
 
       <UiCard>
         <div class="card-block">
-          <p class="section-eyebrow">2. Resultado</p>
-          <h2 class="section-title">Status e dados retornados</h2>
+          <p class="section-eyebrow">Lista</p>
+          <h2 class="section-title">Todas as solicitações</h2>
 
-          <div v-if="decisionResult" class="result-box">
-            <div class="result-box__header">
-              <UiBadge :tone="statusTone(decisionResult.status)">{{ statusLabel(decisionResult.status) }}</UiBadge>
-              <span class="meta-inline">Respondida em {{ formatDateTime(decisionResult.respondedAt) }}</span>
-            </div>
+          <div v-if="loadingHistory" class="empty-state">
+            <p>Carregando histórico...</p>
+          </div>
 
-            <p class="request-item__meta">
-              Aplicação: {{ decisionResult.externalAgentName }}<br />
-              E-mail: {{ createdRequest?.externalAgentEmail }}
-            </p>
+          <div v-else-if="requestHistory.length > 0" class="history-list">
+            <div v-for="req in requestHistory" :key="req.requestId" class="history-item">
+              <div class="history-item__header">
+                <UiBadge :tone="statusTone(req.status)">{{ statusLabel(req.status) }}</UiBadge>
+                <span class="meta-inline">{{ formatDateTime(req.requestedAt) }}</span>
+              </div>
 
-            <div v-if="sharedDataResult">
-              <p class="request-item__meta">Dados enviados para a aplicação:</p>
-              <pre>{{ toPrettyJson(sharedDataResult) }}</pre>
-            </div>
-
-            <div v-else>
-              <p class="request-item__meta">Acesso rejeitado.</p>
-              <p v-if="decisionResult.reason" class="request-item__meta">
-                Motivo: {{ decisionResult.reason }}
+              <p class="history-item__meta">
+                Aplicação: <strong>{{ req.externalAgentName }}</strong><br />
+                E-mail: {{ req.externalAgentEmail }}<br />
+                Request ID: {{ req.requestId }}
               </p>
+
+              <div v-if="req.respondedAt" class="history-item__response">
+                <p class="history-item__meta">
+                  Respondida em {{ formatDateTime(req.respondedAt) }}
+                  <span v-if="req.reason">({{ req.reason }})</span>
+                </p>
+              </div>
+
+              <div v-if="req.status === 'APPROVED'" class="history-item__actions">
+                <UiButton
+                  :disabled="revokingRequestId === req.requestId"
+                  @click="handleRevoke(req.requestId)"
+                >
+                  {{ revokingRequestId === req.requestId ? 'Revogando...' : 'Revogar acesso' }}
+                </UiButton>
+              </div>
             </div>
           </div>
 
           <div v-else class="empty-state">
-            <p>Nenhuma resposta foi concluída ainda.</p>
-            <p>Após aprovar ou negar no pop-up, o status e os dados aparecem aqui.</p>
+            <p>Nenhuma solicitação de compartilhamento no histórico.</p>
+          </div>
+        </div>
+      </UiCard>
+
+      <UiCard>
+        <div class="card-block">
+          <p class="section-eyebrow">Diagnóstico</p>
+          <h2 class="section-title">Resposta bruta do histórico</h2>
+          <div v-if="requestHistory.length > 0" class="result-box">
+            <pre>{{ toPrettyJson(requestHistory) }}</pre>
+          </div>
+          <div v-else class="empty-state">
+            <p>Sem dados para exibir.</p>
           </div>
         </div>
       </UiCard>
@@ -373,20 +242,6 @@ async function handleOpenConsentPopup() {
   font-size: 0.9rem;
 }
 
-.form-grid {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.field {
-  display: grid;
-  gap: 0.4rem;
-}
-
-.field--full {
-  grid-column: 1 / -1;
-}
-
 .actions {
   display: grid;
   gap: 0.65rem;
@@ -399,32 +254,51 @@ async function handleOpenConsentPopup() {
   background: #f8fbff;
 }
 
-.result-box pre,
-.modal-panel pre {
+.result-box pre {
   margin: 0;
   overflow: auto;
   font-size: 0.78rem;
   line-height: 1.42;
 }
 
-.result-box__header {
+.history-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.history-item {
+  border: 1px solid #dbeafe;
+  border-radius: 0.6rem;
+  padding: 0.65rem;
+  background: #f8fbff;
+}
+
+.history-item__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.55rem;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
 }
 
-.list-title {
-  margin: 0 0 0.65rem;
-  color: #1e293b;
-  font-size: 0.92rem;
-}
-
-.request-item__meta {
-  margin: 0.35rem 0 0;
-  font-size: 0.82rem;
+.history-item__meta {
+  margin: 0.25rem 0;
+  font-size: 0.78rem;
   color: #5f7387;
+}
+
+.history-item__response {
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid #bfdbfe;
+}
+
+.history-item__actions {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e0f2fe;
+  display: grid;
+  gap: 0.4rem;
 }
 
 .meta-inline {
@@ -440,17 +314,6 @@ async function handleOpenConsentPopup() {
   padding: 0.85rem;
 }
 
-.link-button {
-  border: 0;
-  background: transparent;
-  color: #0369a1;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-}
-
 .notice {
   margin-top: 1rem;
 }
@@ -460,7 +323,7 @@ async function handleOpenConsentPopup() {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .page-grid > :last-child {
+  .page-grid > :nth-child(3) {
     grid-column: 1 / -1;
   }
 }

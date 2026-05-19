@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
+import { getAuthUser } from '@/services/authService'
 import {
   getLoginSharingConsent,
   respondLoginSharingRequest,
@@ -49,6 +50,8 @@ const statusMessage = ref('')
 const apiError = ref<ApiError | null>(null)
 const consentRequest = ref<LoginSharingRequest | null>(null)
 const previewData = ref<SharedUserDataResponse | null>(null)
+const isUserVerified = ref(false)
+const verificationError = ref<string | null>(null)
 
 const requestId = computed(() => {
   const value = route.query.requestId
@@ -67,6 +70,11 @@ const externalAgentName = computed(() => {
 
 const externalAgentEmail = computed(() => {
   const value = route.query.externalAgentEmail
+  return Array.isArray(value) ? value[0] ?? '' : (typeof value === 'string' ? value : '')
+})
+
+const sourceOrigin = computed(() => {
+  const value = route.query.sourceOrigin
   return Array.isArray(value) ? value[0] ?? '' : (typeof value === 'string' ? value : '')
 })
 
@@ -137,8 +145,35 @@ function buildPreviewData() {
   }
 }
 
+function verifyUserIdentity(): boolean {
+  // Verificar se o usuário está autenticado e se seu email corresponde ao userEmail solicitado
+  const authUser = getAuthUser()
+  const requestedEmail = userEmail.value.trim().toLowerCase()
+
+  if (!authUser) {
+    verificationError.value = 'Usuario não está autenticado. Faça login para continuar.'
+    return false
+  }
+
+  const authenticatedEmail = (authUser.email ?? '').trim().toLowerCase()
+
+  if (authenticatedEmail !== requestedEmail) {
+    verificationError.value = `Acesso negado. Você está autenticado como "${authUser.email}" mas esta solicitação é para "${userEmail.value}". Faça logout e entre com a conta correta.`
+    return false
+  }
+
+  isUserVerified.value = true
+  return true
+}
+
 async function loadConsent() {
   if (!requestId.value) return
+
+  // Validar identidade do usuário primeiro
+  if (!verifyUserIdentity()) {
+    loadingState.loading = false
+    return
+  }
 
   clearAlerts()
   loadingState.loading = true
@@ -158,7 +193,10 @@ async function loadConsent() {
 }
 
 async function handleRespond() {
-  if (!requestId.value) return
+  if (!requestId.value || !isUserVerified.value) {
+    apiError.value = toApiError(new Error('Usuário não verificado. Operação não permitida.'))
+    return
+  }
 
   clearAlerts()
   loadingState.responding = true
@@ -203,13 +241,15 @@ async function handleRespond() {
       previewData.value = payloadData
     }
 
+    const resolvedStatus: LoginSharingStatus = responseForm.approved ? 'APPROVED' : 'REJECTED'
+
     const message: ConsentResultMessage = {
       type: 'login-sharing-consent-result',
       payload: {
         requestId: response.requestId,
         externalAgentName: response.externalAgentName,
-        status: response.status,
-        approved: response.status === 'APPROVED',
+        status: resolvedStatus,
+        approved: responseForm.approved,
         reason: response.reason,
         data: payloadData,
         respondedAt: response.respondedAt ?? new Date().toISOString(),
@@ -219,7 +259,7 @@ async function handleRespond() {
     // debug: log message before posting so we can inspect in devtools if something breaks
     console.log('[login-sharing] posting consent result to opener/localStorage', message)
     try {
-      window.opener?.postMessage(message, window.location.origin)
+      window.opener?.postMessage(message, sourceOrigin.value || window.location.origin)
     } catch (err) {
       console.error('[login-sharing] postMessage failed', err, message)
     }
@@ -242,7 +282,10 @@ async function handleRespond() {
   }
 }
 
-void loadConsent()
+onMounted(() => {
+  loadConsent()
+})
+
 </script>
 
 <template>
@@ -282,7 +325,7 @@ void loadConsent()
             <pre>{{ toPrettyJson(previewData) }}</pre>
           </div>
 
-          <div class="response-box">
+          <div v-if="isUserVerified" class="response-box">
             <UiLabel>Decisão</UiLabel>
             <div class="radio-group">
               <label class="radio-item">
@@ -301,11 +344,19 @@ void loadConsent()
               {{ loadingState.responding ? 'Enviando...' : 'Confirmar' }}
             </UiButton>
           </div>
+
+          <div v-else class="empty-state">
+            <p>Verificação de identidade pendente.</p>
+            <p>Você precisa estar autenticado com a conta correta para confirmar.</p>
+          </div>
         </div>
       </UiCard>
     </div>
 
     <UiAlert v-if="statusMessage" class="notice">{{ statusMessage }}</UiAlert>
+    <UiAlert v-if="verificationError" tone="danger" class="notice">
+      {{ verificationError }}
+    </UiAlert>
     <UiAlert v-if="apiError" tone="danger" class="notice">
       {{ apiError.message }}
       <span v-if="apiError.status">(status: {{ apiError.status }})</span>
