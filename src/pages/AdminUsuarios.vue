@@ -344,7 +344,7 @@ async function confirmRoleChange() {
   }
 }
 
-async function confirmAnonymizeUser() {
+async function confirmDeleteUser() {
   if (!selectedUser.value) return
 
   isLoading.value = true
@@ -352,7 +352,7 @@ async function confirmAnonymizeUser() {
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/usuarios/${selectedUser.value.id}/anonimizar`,
+      `${API_BASE_URL}/usuarios/${selectedUser.value.id}/deletar`,
       {
         ...createProtectedJsonRequest(),
         method: 'POST',
@@ -651,7 +651,7 @@ onMounted(() => {
 
       <div v-else-if="selectedDialog === 'delete' && selectedUser" class="modal-card modal-card--compact">
         <button type="button" class="modal-close" aria-label="Fechar" @click="closeDialog">×</button>
-        <p class="modal-title modal-title--compact">Anonimizar este usuário?</p>
+        <p class="modal-title modal-title--compact">Deletar este usuário?</p>
         <p class="modal-description">
           Essa ação remove os dados pessoais do cadastro e não pode ser desfeita.
         </p>
@@ -660,8 +660,8 @@ onMounted(() => {
           <UiButton variant="secondary" class="modal-action" @click="closeDialog" :disabled="isLoading">
             Cancelar
           </UiButton>
-          <UiButton class="modal-action modal-action--danger" @click="confirmAnonymizeUser" :disabled="isLoading">
-            {{ isLoading ? 'Anonimizando...' : 'Sim, anonimizar' }}
+          <UiButton class="modal-action modal-action--danger" @click="confirmDeleteUser" :disabled="isLoading">
+            {{ isLoading ? 'Deletando...' : 'Sim, deletar' }}
           </UiButton>
         </div>
       </div>
