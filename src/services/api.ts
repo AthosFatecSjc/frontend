@@ -44,7 +44,7 @@ export function createProtectedJsonRequest(init?: RequestInit): RequestInit {
     ...init,
     headers: {
       ...createAuthHeaders(),
-      ...(init?.headers ?? {}),
+      ...init?.headers,
     },
   }
 }

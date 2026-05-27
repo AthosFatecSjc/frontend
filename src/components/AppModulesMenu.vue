@@ -15,6 +15,7 @@ const route = useRoute()
 const items = [
   { label: 'Minha Conta', to: '/minha-conta', icon: 'user', match: ['/minha-conta'] },
   { label: 'Mapa de Calor', to: '/mapa-calor', icon: 'map', match: ['/mapa-calor'] },
+  { label: 'Previsão', to: '/previsao', icon: 'chart', match: ['/previsao'] },
   { label: 'Teste Login Sharing', to: '/testes/login-sharing', icon: 'share', match: ['/testes/login-sharing'] },
   { label: 'Gestão de Usuários', to: '/admin/usuarios', icon: 'users', match: ['/admin/usuarios'] },
   { label: 'Logs e Auditoria', to: '/admin/logs', icon: 'logs', match: ['/admin/logs'] },
@@ -23,7 +24,7 @@ const items = [
 const visibleItems = computed(() => items.map(item => ({
   ...item,
   isActive: item.match.some(path => route.path.startsWith(path)),
-})).filter((item) => item.to === '/minha-conta' || item.to === '/mapa-calor' || item.to === '/testes/login-sharing' || hasAdminAccess()))
+})).filter((item) => item.to === '/minha-conta' || item.to === '/mapa-calor' || item.to === '/previsao' || item.to === '/testes/login-sharing' || hasAdminAccess()))
 </script>
 
 <template>
@@ -55,6 +56,24 @@ const visibleItems = computed(() => items.map(item => ({
               />
               <path
                 d="M9 4v14M15 6v14"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+            </template>
+            <template v-else-if="item.icon === 'chart'">
+              <path
+                d="M3 3v18h18"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+              <path
+                d="M6 18v-5M11 18v-8M16 18v-3"
                 fill="none"
                 stroke="currentColor"
                 stroke-linecap="round"

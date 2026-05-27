@@ -15,7 +15,7 @@ function createUserAuthRequest(tokenOverride?: string, init?: RequestInit): Requ
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${tokenOverride.trim()}`,
-        ...(init?.headers ?? {}),
+        ...init?.headers,
       },
     }
   }
