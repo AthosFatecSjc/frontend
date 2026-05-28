@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout.vue'
 import GraficoPrevisao from '@/components/mapa/GraficoPrevisao.vue'
 import UiCard from '@/components/ui/UiCard.vue'
 
+const route = useRoute()
 const regioesDisponiveis = ref([
   { id: 'centro', nome: 'Centro' },
   { id: 'centro_oeste', nome: 'Centro-Oeste' },
@@ -15,12 +17,17 @@ const regioesDisponiveis = ref([
 
 const regiaoSelecionada = ref<{ id: string; nome: string } | null>(null)
 
+const cnpjConsultado = computed(() => {
+  const value = route.query.cnpj
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim()
+  }
+  return ''
+})
 const informacaoGeral = ref(`
 Gráficos gerados pelo modelo Prophet.
 
 A página apresenta as previsões, com separação clara entre histórico real e previsão futura.
-
-Use os controles abaixo para escolher a região do modelo e o indicador que deseja ver.
 `)
 
 onMounted(() => {
@@ -38,6 +45,7 @@ onMounted(() => {
       <div class="secao-titulo">
         <h1>Gráficos de Previsibilidade</h1>
         <p class="descricao-geral">{{ informacaoGeral }}</p>
+        <p class="cnpj-info" v-if="cnpjConsultado">CNPJ consultado: {{ cnpjConsultado }}</p>
       </div>
 
       <!-- Seleção de Região do Modelo -->
@@ -174,6 +182,13 @@ onMounted(() => {
   padding: 1rem;
   border-radius: 6px;
   border-left: 4px solid #2196f3;
+}
+
+.cnpj-info {
+  margin: 1rem 0 0;
+  font-size: 0.95rem;
+  color: #34495e;
+  font-weight: 600;
 }
 
 .card-selecao {
