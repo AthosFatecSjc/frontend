@@ -4,36 +4,29 @@ import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout.vue'
 import GraficoPrevisao from '@/components/mapa/GraficoPrevisao.vue'
 import UiCard from '@/components/ui/UiCard.vue'
 
-// Mock data: em produção, virá da API
-const conjuntosSelecionaveis = ref([
-  { id: '1', nome: 'Conjunto Sul - PA' },
-  { id: '2', nome: 'Conjunto Leste - PA' },
-  { id: '3', nome: 'Conjunto Oeste - PA' },
-  { id: '4', nome: 'Conjunto Centro - PA' },
+const regioesDisponiveis = ref([
+  { id: 'centro', nome: 'Centro' },
+  { id: 'centro_oeste', nome: 'Centro-Oeste' },
+  { id: 'nordeste', nome: 'Nordeste' },
+  { id: 'norte', nome: 'Norte' },
+  { id: 'sul', nome: 'Sul' },
+  { id: 'suldeste', nome: 'Sudeste' },
 ])
 
-const conjuntoSelecionado = ref<{ id: string; nome: string } | null>(null)
+const regiaoSelecionada = ref<{ id: string; nome: string } | null>(null)
 
 const informacaoGeral = ref(`
-Previsões de Indicadores de Continuidade
+Gráficos gerados pelo modelo Prophet.
 
-Esta tela exibe análises preditivas dos indicadores DEC (Duração Equivalente de Interrupção por Consumidor) 
-e FEC (Frequência Equivalente de Interrupção por Consumidor) baseadas em modelos de série temporal 
-treinados com dados históricos da ANEEL.
+A página apresenta as previsões, com separação clara entre histórico real e previsão futura.
 
-As previsões mostram:
-- 📊 Histórico Real: Dados coletados nos últimos 24 meses
-- 🔮 Previsão: Estimativas para os próximos 12 meses
-- 📈 Intervalo de Confiança: Margem de erro esperada da previsão
-
-Selecione um conjunto de unidades consumidoras para visualizar as previsões.
+Use os controles abaixo para escolher a região do modelo e o indicador que deseja ver.
 `)
 
 onMounted(() => {
-  // Seleciona o primeiro conjunto por padrão
-  const primeiro = conjuntosSelecionaveis.value[0]
-  if (primeiro && !conjuntoSelecionado.value) {
-    conjuntoSelecionado.value = primeiro
+  const primeira = regioesDisponiveis.value[0]
+  if (primeira && !regiaoSelecionada.value) {
+    regiaoSelecionada.value = primeira
   }
 })
 </script>
@@ -47,30 +40,30 @@ onMounted(() => {
         <p class="descricao-geral">{{ informacaoGeral }}</p>
       </div>
 
-      <!-- Seleção de Conjunto -->
+      <!-- Seleção de Região do Modelo -->
       <UiCard class="card-selecao">
         <template #header>
-          <h2>Selecione um Conjunto</h2>
+          <h2>Selecione a Região do Modelo</h2>
         </template>
 
         <div class="selecao-conjunto">
           <div class="conjunto-grid">
             <div
-              v-for="conjunto in conjuntosSelecionaveis"
-              :key="conjunto.id"
-              class="conjunto-item"
-              :class="{ ativo: conjuntoSelecionado?.id === conjunto.id }"
-              @click="conjuntoSelecionado = conjunto"
+              v-for="regiao in regioesDisponiveis"
+              :key="regiao.id"
+              class="regiao-item"
+              :class="{ ativo: regiaoSelecionada?.id === regiao.id }"
+              @click="regiaoSelecionada = regiao"
             >
-              <span class="conjunto-nome">{{ conjunto.nome }}</span>
+              <span class="conjunto-nome">{{ regiao.nome }}</span>
             </div>
           </div>
         </div>
       </UiCard>
 
       <!-- Gráfico Selecionado -->
-      <template v-if="conjuntoSelecionado">
-        <GraficoPrevisao :conjunto-id="conjuntoSelecionado.id" :conjunto-nome="conjuntoSelecionado.nome" />
+      <template v-if="regiaoSelecionada">
+        <GraficoPrevisao :regiao-id="regiaoSelecionada.id" :regiao-nome="regiaoSelecionada.nome" />
       </template>
 
       <!-- Legenda de Cores -->
@@ -193,31 +186,35 @@ onMounted(() => {
 
 .conjunto-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
 }
 
-.conjunto-item {
-  padding: 1.5rem;
+.conjunto-item,
+.regiao-item {
+  padding: 1rem;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: #f9f9f9;
-  min-height: 80px;
+  min-height: 60px;
+  font-size: 0.95rem;
 }
 
-.conjunto-item:hover {
+.conjunto-item:hover,
+.regiao-item:hover {
   border-color: #2196f3;
   background-color: #f0f7ff;
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(33, 150, 243, 0.15);
 }
 
-.conjunto-item.ativo {
+.conjunto-item.ativo,
+.regiao-item.ativo {
   border-color: #2196f3;
   background-color: #e3f2fd;
   font-weight: 600;
