@@ -15,6 +15,7 @@ const route = useRoute()
 const items = [
   { label: 'Minha Conta', to: '/minha-conta', icon: 'user', match: ['/minha-conta'] },
   { label: 'Mapa de Calor', to: '/mapa-calor', icon: 'map', match: ['/mapa-calor'] },
+  { label: 'Teste Login Sharing', to: '/testes/login-sharing', icon: 'share', match: ['/testes/login-sharing'] },
   { label: 'Gestão de Usuários', to: '/admin/usuarios', icon: 'users', match: ['/admin/usuarios'] },
   { label: 'Logs e Auditoria', to: '/admin/logs', icon: 'logs', match: ['/admin/logs'] },
   { label: 'Administrar Termos', to: '/admin-terms', icon: 'terms', match: ['/admin-terms'] },
@@ -23,7 +24,7 @@ const items = [
 const visibleItems = computed(() => items.map(item => ({
   ...item,
   isActive: item.match.some(path => route.path.startsWith(path)),
-})).filter((item) => item.to === '/minha-conta' || item.to === '/mapa-calor' || item.to === '/admin-terms' || hasAdminAccess()))
+})).filter((item) => item.to === '/minha-conta' || item.to === '/mapa-calor' || item.to === '/testes/login-sharing' || item.to === '/admin-terms' || hasAdminAccess()))
 </script>
 
 <template>
@@ -40,23 +41,92 @@ const visibleItems = computed(() => items.map(item => ({
         <span class="modules-menu__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" class="modules-menu__svg">
             <template v-if="item.icon === 'map'">
-              <path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2Z" fill="none" stroke="currentColor" stroke-linecap="round"
-                stroke-linejoin="round" stroke-width="1.7" />
-              <path d="M9 4v14M15 6v14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                stroke-width="1.7" />
+              <path
+                d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+              <path
+                d="M9 4v14M15 6v14"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
             </template>
             <template v-else-if="item.icon === 'logs'">
-              <path d="M14 3h-4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9Z" fill="none" stroke="currentColor"
-                stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
-              <path d="M14 3v6h6M11 13h6M11 17h6" fill="none" stroke="currentColor" stroke-linecap="round"
-                stroke-linejoin="round" stroke-width="1.7" />
+              <path
+                d="M14 3h-4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+              <path
+                d="M14 3v6h6M11 13h6M11 17h6"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+            </template>
+            <template v-else-if="item.icon === 'share'">
+              <circle
+                cx="6.5"
+                cy="12"
+                r="2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+              />
+              <circle
+                cx="16.5"
+                cy="6"
+                r="2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+              />
+              <circle
+                cx="16.5"
+                cy="18"
+                r="2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+              />
+              <path
+                d="M8.2 11.1 14.8 7M8.2 12.9 14.8 17"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
             </template>
             <template v-else-if="item.icon === 'users'">
               <path
                 d="M9.5 12.25a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.25 0a2.75 2.75 0 1 0-2.75-2.75 2.75 2.75 0 0 0 2.75 2.75ZM4.5 19.5a5 5 0 0 1 10 0"
-                fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
-              <path d="M14.75 19.5a4.25 4.25 0 0 0-8.5 0" fill="none" stroke="currentColor" stroke-linecap="round"
-                stroke-linejoin="round" stroke-width="1.7" />
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
+              <path
+                d="M14.75 19.5a4.25 4.25 0 0 0-8.5 0"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              />
             </template>
             <template v-else-if="item.icon === 'terms'">
               <path
