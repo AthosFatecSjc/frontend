@@ -54,6 +54,11 @@ const router = createRouter({
       component: () => import('../pages/MapaCalor.vue'),
     },
     {
+      path: '/previsao',
+      name: 'Previsao',
+      component: () => import('../pages/PaginaPrevisao.vue'),
+    },
+    {
       path: '/minha-conta',
       name: 'MinhaConta',
       component: () => import('../pages/MinhaConta.vue'),
