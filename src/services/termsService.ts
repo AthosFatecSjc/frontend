@@ -1,7 +1,7 @@
 import type { ConsentimentosVigentesResponse } from '../types/cadastro'
 import type { LoginResponse, } from '../types/auth'
 import { API_BASE_URL } from './api'
-import { getAuthUser } from './authService'
+import { createAuthHeaders, getAuthUser } from './authService'
 import type { Terms } from '@/types/terms'
 
 const ACCESS_TOKEN_STORAGE_KEY = 'accessToken'
@@ -37,6 +37,70 @@ export async function getPendingTerms(requiredOnly = false): Promise<Terms[]> {
   }
 
   return await response.json()
+}
+
+export async function getAcceptedTerms(): Promise<Terms[]> {
+  const authUser = getAuthUser()
+
+  if (!authUser) {
+    throw new Error('Usuario nao autenticado.')
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/users/${authUser.userId}/terms/accepted`,
+  )
+
+  if (!response.ok) {
+    throw new Error('Nao foi possivel carregar os termos aceitos.')
+  }
+
+  return await response.json()
+}
+
+export async function approveTerms(termIds: string[]): Promise<void> {
+  if (!termIds?.length) return;
+  
+  const authUser = getAuthUser()
+
+  if (!authUser) {
+    throw new Error('Usuario nao autenticado.')
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/users/${authUser.userId}/terms/approve`,
+    {
+      headers: createAuthHeaders(),
+      method: 'POST',
+      body: JSON.stringify(termIds),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error('Nao foi possivel aprovar os termos.')
+  }
+}
+
+export async function revokeTerms(termIds: string[]): Promise<void> {
+  if (!termIds?.length) return;
+
+  const authUser = getAuthUser()
+
+  if (!authUser) {
+    throw new Error('Usuario nao autenticado.')
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/users/${authUser.userId}/terms/revoke`,
+    {
+      headers: createAuthHeaders(),
+      method: 'POST',
+      body: JSON.stringify(termIds),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error('Nao foi possivel revogar os termos.')
+  }
 }
 
 export async function resolverPendenciasDeTermos(

@@ -38,6 +38,12 @@ const router = createRouter({
       },
     },
     {
+      path: '/admin-terms',
+      name: 'AdminTerms',
+      component: () => import('../pages/AdminTermos.vue'),
+
+    },
+    {
       path: '/dashboard',
       name: 'Dashboard',
       component: () => import('../pages/Dashboard.vue'),
