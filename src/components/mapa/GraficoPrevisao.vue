@@ -1,23 +1,16 @@
 ﻿<script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import UiCard from '@/components/ui/UiCard.vue'
-import UiButton from '@/components/ui/UiButton.vue'
-import UiLabel from '@/components/ui/UiLabel.vue'
 
 const props = defineProps<{
   regiaoId: string
   regiaoNome?: string
+  indicador: 'DEC' | 'FEC'
 }>()
 
-const indicadorSelecionado = ref<'DEC' | 'FEC'>('DEC')
-
-const graphSource = computed(() => `/modelos-graficos/previsao_${indicadorSelecionado.value.toLowerCase()}_${props.regiaoId}.png`)
+const graphSource = computed(() => `/modelos-graficos/previsao_${props.indicador.toLowerCase()}_${props.regiaoId}.png`)
 const seriesSource = computed(() => `/modelos-graficos/serie_temporal_${props.regiaoId}.png`)
-const altText = computed(() => `Previsão de ${indicadorSelecionado.value} para ${props.regiaoNome || 'região selecionada'}`)
-
-function mudarIndicador(novoIndicador: 'DEC' | 'FEC') {
-  indicadorSelecionado.value = novoIndicador
-}
+const altText = computed(() => `Previsão de ${props.indicador} para ${props.regiaoNome || 'região selecionada'}`)
 </script>
 
 <template>
@@ -28,23 +21,6 @@ function mudarIndicador(novoIndicador: 'DEC' | 'FEC') {
           <h2>Previsão do Modelo</h2>
           <p class="subtitle">Gráficos estáticos gerados no Colab com Prophet. Histórico real e previsão futura em destaque.</p>
         </div>
-
-        <div class="indicador-buttons">
-          <UiButton
-            :variant="indicadorSelecionado === 'DEC' ? 'primary' : 'secondary'"
-            size="small"
-            @click="mudarIndicador('DEC')"
-          >
-            DEC
-          </UiButton>
-          <UiButton
-            :variant="indicadorSelecionado === 'FEC' ? 'primary' : 'secondary'"
-            size="small"
-            @click="mudarIndicador('FEC')"
-          >
-            FEC
-          </UiButton>
-        </div>
       </div>
     </template>
 
@@ -52,7 +28,7 @@ function mudarIndicador(novoIndicador: 'DEC' | 'FEC') {
       <div class="image-section">
         <figure class="image-card">
           <img :src="graphSource" :alt="altText" class="graph-image" />
-          <figcaption>Previsão do indicador {{ indicadorSelecionado }} para {{ props.regiaoNome }}.</figcaption>
+          <figcaption>Previsão do indicador {{ props.indicador }} para {{ props.regiaoNome }}.</figcaption>
         </figure>
       </div>
 
@@ -90,12 +66,6 @@ function mudarIndicador(novoIndicador: 'DEC' | 'FEC') {
   margin: 0.5rem 0 0;
   color: #555;
   line-height: 1.5;
-}
-
-.indicador-buttons {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
 }
 
 .card-content {

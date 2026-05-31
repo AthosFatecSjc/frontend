@@ -1,78 +1,59 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref } from 'vue'
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout.vue'
 import GraficoPrevisao from '@/components/mapa/GraficoPrevisao.vue'
 import UiCard from '@/components/ui/UiCard.vue'
+import UiLabel from '@/components/ui/UiLabel.vue'
 
-const route = useRoute()
-const regioesDisponiveis = ref([
-  { id: 'centro', nome: 'Centro' },
+const regioesDisponiveis = [
   { id: 'centro_oeste', nome: 'Centro-Oeste' },
   { id: 'nordeste', nome: 'Nordeste' },
   { id: 'norte', nome: 'Norte' },
   { id: 'sul', nome: 'Sul' },
   { id: 'suldeste', nome: 'Sudeste' },
-])
+]
 
-const regiaoSelecionada = ref<{ id: string; nome: string } | null>(null)
+const regiaoIdSelecionada = ref('centro_oeste')
+const indicadorSelecionado = ref<'DEC' | 'FEC'>('DEC')
 
-const cnpjConsultado = computed(() => {
-  const value = route.query.cnpj
-  if (typeof value === 'string' && value.trim().length > 0) {
-    return value.trim()
-  }
-  return ''
-})
-const informacaoGeral = ref(`
-Gráficos gerados pelo modelo Prophet.
-
-A página apresenta as previsões, com separação clara entre histórico real e previsão futura.
-`)
-
-onMounted(() => {
-  const primeira = regioesDisponiveis.value[0]
-  if (primeira && !regiaoSelecionada.value) {
-    regiaoSelecionada.value = primeira
-  }
-})
+const regiaoSelecionada = computed(
+  () => regioesDisponiveis.find((r) => r.id === regiaoIdSelecionada.value) ?? regioesDisponiveis[0]!,
+)
 </script>
 
 <template>
-  <AuthenticatedLayout title="Previsão" description="Gráficos de previsibilidade com histórico real e previsões futuras">
+  <AuthenticatedLayout
+    title="Gráficos de Previsibilidade"
+    description="Gráficos gerados pelo modelo Prophet. A página apresenta as previsões, com separação clara entre histórico real e previsão futura."
+  >
     <div class="previsao-container">
-      <!-- Título e Descrição -->
-      <div class="secao-titulo">
-        <h1>Gráficos de Previsibilidade</h1>
-        <p class="descricao-geral">{{ informacaoGeral }}</p>
-        <p class="cnpj-info" v-if="cnpjConsultado">CNPJ consultado: {{ cnpjConsultado }}</p>
-      </div>
-
-      <!-- Seleção de Região do Modelo -->
-      <UiCard class="card-selecao">
-        <template #header>
-          <h2>Selecione a Região do Modelo</h2>
-        </template>
-
-        <div class="selecao-conjunto">
-          <div class="conjunto-grid">
-            <div
-              v-for="regiao in regioesDisponiveis"
-              :key="regiao.id"
-              class="regiao-item"
-              :class="{ ativo: regiaoSelecionada?.id === regiao.id }"
-              @click="regiaoSelecionada = regiao"
-            >
-              <span class="conjunto-nome">{{ regiao.nome }}</span>
-            </div>
+      <!-- Filtros -->
+      <UiCard class="filters-panel">
+        <div class="filters-grid">
+          <div class="field-group">
+            <UiLabel class="field-label">Região</UiLabel>
+            <select v-model="regiaoIdSelecionada" class="field-input">
+              <option v-for="regiao in regioesDisponiveis" :key="regiao.id" :value="regiao.id">
+                {{ regiao.nome }}
+              </option>
+            </select>
+          </div>
+          <div class="field-group">
+            <UiLabel class="field-label">Indicador</UiLabel>
+            <select v-model="indicadorSelecionado" class="field-input">
+              <option value="DEC">DEC — Duração Equivalente de Interrupção</option>
+              <option value="FEC">FEC — Frequência Equivalente de Interrupção</option>
+            </select>
           </div>
         </div>
       </UiCard>
 
-      <!-- Gráfico Selecionado -->
-      <template v-if="regiaoSelecionada">
-        <GraficoPrevisao :regiao-id="regiaoSelecionada.id" :regiao-nome="regiaoSelecionada.nome" />
-      </template>
+      <!-- Gráficos -->
+      <GraficoPrevisao
+        :regiao-id="regiaoSelecionada.id"
+        :regiao-nome="regiaoSelecionada.nome"
+        :indicador="indicadorSelecionado"
+      />
 
       <!-- Legenda de Cores -->
       <UiCard class="card-legenda">
@@ -162,84 +143,45 @@ onMounted(() => {
   gap: 2rem;
 }
 
-.secao-titulo {
-  margin-bottom: 1rem;
+.filters-panel {
+  padding: 18px 20px;
 }
 
-.secao-titulo h1 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin: 0 0 1rem 0;
-  color: #333;
-}
-
-.descricao-geral {
-  font-size: 1rem;
-  line-height: 1.6;
-  color: #666;
-  white-space: pre-wrap;
-  background-color: #f5f5f5;
-  padding: 1rem;
-  border-radius: 6px;
-  border-left: 4px solid #2196f3;
-}
-
-.cnpj-info {
-  margin: 1rem 0 0;
-  font-size: 0.95rem;
-  color: #34495e;
-  font-weight: 600;
-}
-
-.card-selecao {
-  width: 100%;
-}
-
-.selecao-conjunto {
-  padding: 1rem;
-}
-
-.conjunto-grid {
+.filters-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: end;
 }
 
-.conjunto-item,
-.regiao-item {
-  padding: 1rem;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.25s ease;
+.field-group {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f9f9f9;
-  min-height: 60px;
-  font-size: 0.95rem;
+  flex-direction: column;
+  gap: 5px;
 }
 
-.conjunto-item:hover,
-.regiao-item:hover {
-  border-color: #2196f3;
-  background-color: #f0f7ff;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(33, 150, 243, 0.15);
+.field-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
 }
 
-.conjunto-item.ativo,
-.regiao-item.ativo {
-  border-color: #2196f3;
-  background-color: #e3f2fd;
-  font-weight: 600;
-  color: #1976d2;
-  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.25);
+.field-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #eefcff;
+  color: #111827;
+  border: 1px solid #dde2ea;
+  border-radius: 1rem;
+  padding: 0.8rem 0.9rem;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.conjunto-nome {
-  font-size: 1rem;
-  text-align: center;
+.field-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
 }
 
 .card-legenda {
@@ -350,7 +292,7 @@ onMounted(() => {
     font-size: 1.8rem;
   }
 
-  .conjunto-grid {
+  .filters-grid {
     grid-template-columns: 1fr;
   }
 
