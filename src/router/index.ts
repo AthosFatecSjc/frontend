@@ -38,6 +38,12 @@ const router = createRouter({
       },
     },
     {
+      path: '/admin-terms',
+      name: 'AdminTerms',
+      component: () => import('../pages/AdminTermos.vue'),
+
+    },
+    {
       path: '/dashboard',
       name: 'Dashboard',
       component: () => import('../pages/Dashboard.vue'),
@@ -48,9 +54,27 @@ const router = createRouter({
       component: () => import('../pages/MapaCalor.vue'),
     },
     {
+      path: '/previsao',
+      name: 'Previsao',
+      component: () => import('../pages/PaginaPrevisao.vue'),
+    },
+    {
       path: '/minha-conta',
       name: 'MinhaConta',
       component: () => import('../pages/MinhaConta.vue'),
+    },
+    {
+      path: '/testes/login-sharing',
+      name: 'LoginSharingTest',
+      component: () => import('../pages/LoginSharingTest.vue'),
+    },
+    {
+      path: '/testes/login-sharing/consent',
+      name: 'LoginSharingConsentPopup',
+      component: () => import('../pages/LoginSharingConsentPopup.vue'),
+      meta: {
+        whitelistRequiredTermsAcceptance: true,
+      },
     },
     {
       path: '/admin/logs',
